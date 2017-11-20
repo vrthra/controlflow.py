@@ -153,6 +153,7 @@ class CFGNode(dict):
         self.children = []
         self.ast_node = ast
         self.rid  = CFGNode.registry
+        self.calls = None
         CFGNode.registry += 1
         CFGNode.cache[self.rid] = self
 
@@ -165,11 +166,14 @@ class CFGNode(dict):
     def set_from(self, g):
         self.parents.extend([i for i in g])
 
+    def set_calls(self, func):
+        self.calls = func
+
     def to_json(self):
-        return {'id':self.rid, 'parents': self.parents, 'ast':astunparse.unparse(self.ast_node).strip()}
+        return {'id':self.rid, 'parents': self.parents, 'calls': self.calls , 'ast':astunparse.unparse(self.ast_node).strip()}
 
     def to_jsonx(self):
-        return {'id':self.rid, 'parents': [CFGNode.cache[p].to_jsonx() for p in self.parents], 'ast':astunparse.unparse(self.ast_node).strip()}
+        return {'id':self.rid, 'parents': [CFGNode.cache[p].to_jsonx() for p in self.parents], 'calls':self.calls, 'ast':astunparse.unparse(self.ast_node).strip()}
 
 class PyCFG:
     """
@@ -234,9 +238,15 @@ class PyCFG:
             g2 = self.walk(n, g2)
         return [g1, g2]
 
+    def on_call(self, node, graph):
+        #graph = [CFGNode(parents=graph, ast=node)]
+        for g in graph:
+            g.set_calls(node.func.id)
+        return graph
+
     def on_expr(self, node, graph):
         graph = [CFGNode(parents=graph, ast=node)]
-        return graph
+        return self.walk(node.value, graph)
 
     def gen_cfg(self, src):
         """
