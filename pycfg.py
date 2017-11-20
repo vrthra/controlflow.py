@@ -157,23 +157,27 @@ class CFGNode(dict):
         CFGNode.registry += 1
         CFGNode.cache[self.rid] = self
 
+    @classmethod
+    def i(cls, i):
+        return cls.cache[i]
+
     def __str__(self):
-        return "id:%d parents: %s src: %s" % (self.rid, str(self.parents), astunparse.unparse(self.ast_node).strip())
+        return "id:%d parents: %s src[%d]: %s" % (self.rid, str(self.parents), self.ast_node.lineno, astunparse.unparse(self.ast_node).strip())
 
     def __repr__(self):
         return str(self)
 
-    def set_from(self, g):
-        self.parents.extend([i for i in g])
+    def add_from(self, g):
+        self.parents.extend([g.rid for g in g])
 
     def set_calls(self, func):
         self.calls = func
 
     def to_json(self):
-        return {'id':self.rid, 'parents': self.parents, 'calls': self.calls , 'ast':astunparse.unparse(self.ast_node).strip()}
+        return {'id':self.rid, 'parents': self.parents, 'calls': self.calls, 'at':self.ast_node.lineno ,'ast':astunparse.unparse(self.ast_node).strip()}
 
     def to_jsonx(self):
-        return {'id':self.rid, 'parents': [CFGNode.cache[p].to_jsonx() for p in self.parents], 'calls':self.calls, 'ast':astunparse.unparse(self.ast_node).strip()}
+        return {'id':self.rid, 'parents': [CFGNode.cache[p].to_jsonx() for p in self.parents], 'calls':self.calls, 'at':self.ast_node.lineno, 'ast':astunparse.unparse(self.ast_node).strip()}
 
 class PyCFG:
     """
@@ -220,13 +224,54 @@ class PyCFG:
         graph = [CFGNode(parents=graph, ast=node)]
         return graph
 
+    def on_break(self, node, graph):
+        parent = graph[0].parents[0]
+        while not hasattr(CFGNode.i(parent), 'exit_node'):
+            # we have ordered parents
+            parent, = CFGNode.i(parent).parents
+
+        assert hasattr(CFGNode.i(parent), 'exit_node')
+        graph = [CFGNode(parents=graph, ast=node)]
+
+        # make the break one of the parents of label node.
+        CFGNode.i(parent).exit_node.add_from(graph)
+        return graph
+
+    def on_continue(self, node, graph):
+        parent, = graph[0].parents
+        while not hasattr(CFGNode.i(parent), 'exit_node'):
+            # we have ordered parents
+            parent, = CFGNode[parent].parents
+        assert hasattr(CFGNode.i(parent), 'exit_node')
+        graph = [CFGNode(parents=graph, ast=node)]
+
+        # make continue one of the parents of the original test node.
+        CFGNode.i(parent).add_from(graph)
+        return graph
+
     def on_while(self, node, graph):
-        graph = [CFGNode(parents=graph, ast=node.test)]
+        # For a while, the earliest parent is the node.test
+        test_node = CFGNode(parents=graph, ast=node.test)
+        graph = [test_node]
+
+        # This is the exit node for the while loop.
+        # TODO: set the location to be last line of the while.
+        exit_node = CFGNode(parents=graph, ast=ast.copy_location(ast.parse('pass').body[0], node))
+
+        # we attach the label node here so that break can find it.
+        test_node.exit_node = exit_node
+
+        # now we evaluate the body, one at a time.
         g1 = graph
         for n in node.body:
             g1 = self.walk(n, g1)
-        graph[0].set_from([i.rid for i in g1])
-        return graph
+
+        # the test node is looped back at the end of processing.
+        test_node.add_from(g1)
+
+        # link label node back to the condition.
+        exit_node.add_from(graph)
+        return [exit_node]
 
     def on_if(self, node, graph):
         graph = [CFGNode(parents=graph, ast=node.test)]
@@ -236,7 +281,7 @@ class PyCFG:
         g2 = graph
         for n in node.orelse:
             g2 = self.walk(n, g2)
-        return [g1, g2]
+        return g1+g2
 
     def on_call(self, node, graph):
         #graph = [CFGNode(parents=graph, ast=node)]
@@ -254,11 +299,11 @@ class PyCFG:
         >>> i.walk("100")
         5
         """
-        try:
-            node = self.parse(src)
-            return self.walk(node, self.graph)
-        except Exception as e:
-            print(e)
+        #try:
+        node = self.parse(src)
+        return self.walk(node, self.graph)
+        #except Exception as e:
+        #    print(e)
 
 
 if __name__ == '__main__':
