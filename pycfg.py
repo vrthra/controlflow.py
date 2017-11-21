@@ -3,6 +3,7 @@
 # License: GPLv3
 """
 PyCFG for Python MCI
+Use http://viz-js.com/ to view digraph output
 """
 
 __g__ = """
@@ -336,8 +337,13 @@ class PyCFG:
         #    print(e)
 
 def trimcolon(ss):
-    print(ss)
     return '\n'.join([s.strip().split('|')[1] for s in ss.split('\n') if s.strip()])
+
+def process(ss):
+    v = ['%-6d %s' % (k+1,v) for k,v in enumerate([s for s in ss.split('\n') if s.strip()])]
+    print('\n'.join(v))
+    print()
+    return ss.strip()
 
 if __name__ == '__main__':
     #def fetch_src(dt):
@@ -348,19 +354,19 @@ if __name__ == '__main__':
     #print("from pycfg import *\nimport pudb\npudb.set_trace()\n" + src)
     import json
     i = PyCFG()
-    v = i.gen_cfg(trimcolon("""
-    1|x=100
-    2|y=100
-    3|while x>y:
-    4|  if x == y:
-    5|      continue
-    6|  else:
-    7|      x = x + 1
-    8|  print(0)
-    9|  if x is y:
-   10|      break
-   11|  print(1)
-   12|print(2)
+    v = i.gen_cfg(process("""
+x=100
+y=100
+while x>y:
+  if x == y:
+      continue
+  else:
+      x = x + 1
+  print(0)
+  if x is y:
+      break
+  print(1)
+print(2)
     """))
     #for k,v in CFGNode.cache.items():
     #    print(k,v.to_json())
