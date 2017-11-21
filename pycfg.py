@@ -304,7 +304,7 @@ class PyCFG:
 
         # link label node back to the condition.
         exit_node.add_parent(test_node)
-        exit_node.add_parent(p1)
+        # exit_node.add_parent(p1) -- the previous node is not a condition node.
         ast.copy_location(exit_node.ast_node, node.body[-1])
         return exit_node
 
@@ -331,7 +331,7 @@ class PyCFG:
 
         # link label node back to the condition.
         exit_node.add_parent(test_node)
-        exit_node.add_parent(p1)
+        #exit_node.add_parent(p1) -- the previous node is not a condition node
         ast.copy_location(exit_node.ast_node, node.body[-1])
         return exit_node
 

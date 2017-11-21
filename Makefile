@@ -1,10 +1,10 @@
 dots:
 	@python3  pycfg.py example.py -d
 
-json:
+parents:
 	@python3  pycfg.py example.py -p | sort -n -k2
 
-jsonc:
+children:
 	@python3  pycfg.py example.py -c | sort -n -k2
 
 coverage:
