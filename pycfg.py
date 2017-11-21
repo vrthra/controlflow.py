@@ -260,7 +260,7 @@ class PyCFG:
         # make the break one of the parents of label node.
         CFGNode.i(parent).exit_node.add_parent(p)
 
-        return p
+        return myparent
 
     def on_continue(self, node, myparent):
         parent = myparent.parents[0]
@@ -272,7 +272,9 @@ class PyCFG:
 
         # make continue one of the parents of the original test node.
         CFGNode.i(parent).add_parent(p)
-        return p
+        # return the parent because a continue is not the parent
+        # for the just next node
+        return myparent
 
     def on_while(self, node, myparent):
         # For a while, the earliest parent is the node.test
@@ -333,11 +335,31 @@ class PyCFG:
         #except Exception as e:
         #    print(e)
 
+def trimcolon(ss):
+    print(ss)
+    return '\n'.join([s.strip().split('|')[1] for s in ss.split('\n') if s.strip()])
 
 if __name__ == '__main__':
-    def fetch_src(dt):
-        return ''.join([e.source for es in dt for e in es.examples])
-    import doctest, pudb
-    finder = doctest.DocTestFinder()
-    src = fetch_src(finder.find(PyCFG.gen_cfg))
-    print("from pycfg import *\nimport pudb\npudb.set_trace()\n" + src)
+    #def fetch_src(dt):
+    #    return ''.join([e.source for es in dt for e in es.examples])
+    #import doctest, pudb
+    #finder = doctest.DocTestFinder()
+    #src = fetch_src(finder.find(PyCFG.gen_cfg))
+    #print("from pycfg import *\nimport pudb\npudb.set_trace()\n" + src)
+    import json
+    i = PyCFG()
+    v = i.gen_cfg(trimcolon("""
+    1|x=100
+    2|y=100
+    3|while x>y:
+    4|  if x == y:
+    5|      continue
+    6|  print(0)
+    7|  if x is y:
+    8|      break
+    9|  print(1)
+   10|print(2)
+    """))
+    #for k,v in CFGNode.cache.items():
+    #    print(k,v.to_json())
+print(CFGNode.to_dot())
