@@ -146,6 +146,7 @@ import operator
 import json
 import astunparse
 import pygraphviz
+import argparse
 
 class CFGNode(dict):
     registry = 0
@@ -205,7 +206,7 @@ class CFGNode(dict):
             if cnode.parents:
                 for i in cnode.parents:
                     G.add_edge(i, k)
-        print(G.string())
+        return G.string()
 class PyCFG:
     """
     The python CFG
@@ -285,8 +286,7 @@ class PyCFG:
         test_node = self.walk(node.test, test_node)
 
         # This is the exit node for the while loop.
-        # TODO: set the location to be last line of the while.
-        exit_node = CFGNode(parent=test_node, ast=ast.copy_location(ast.parse('pass').body[0], node))
+        exit_node = CFGNode(parent=test_node, ast=ast.parse('pass').body[0])
 
         # we attach the label node here so that break can find it.
         test_node.exit_node = exit_node
@@ -302,6 +302,7 @@ class PyCFG:
         # link label node back to the condition.
         exit_node.add_parent(test_node)
         exit_node.add_parent(p1)
+        ast.copy_location(exit_node.ast_node, node.body[-1])
         return exit_node
 
     def on_if(self, node, myparent):
@@ -314,7 +315,8 @@ class PyCFG:
             g2 = self.walk(n, g2)
 
         # add a dummy
-        exit_node = CFGNode(parent=g1, ast=ast.copy_location(ast.parse('pass').body[0], node))
+        last_body = node.orelse if node.orelse else node.body
+        exit_node = CFGNode(parent=g1, ast=ast.copy_location(ast.parse('pass').body[0], last_body[-1]))
         exit_node.add_parent(g2)
         return exit_node
 
@@ -347,13 +349,15 @@ class PyCFG:
         args = node.args
         returns = node.returns
 
-        enter_node = CFGNode(parent=None, ast=ast.parse('')) # sentinel
-        exit_node = CFGNode(parent=None, ast=ast.parse('')) # sentinel
+        enter_node = CFGNode(parent=None, ast=ast.parse('pass').body[0]) # sentinel
+        ast.copy_location(enter_node.ast_node, node)
+        exit_node = CFGNode(parent=None, ast=ast.parse('pass').body[0]) # sentinel
 
         p = enter_node
         for n in node.body:
             p = self.walk(n, p)
         exit_node.add_parent(p)
+        ast.copy_location(exit_node.ast_node, node.body[-1])
 
         self.functions[fname] = [enter_node, exit_node]
 
@@ -375,50 +379,22 @@ class PyCFG:
         >>> i.walk("100")
         5
         """
-        #try:
         node = self.parse(src)
         return self.link_functions(self.walk(node, self.founder))
-        #except Exception as e:
-        #    print(e)
 
-def trimcolon(ss):
-    return '\n'.join([s.strip().split('|')[1] for s in ss.split('\n') if s.strip()])
-
-def process(ss):
-    ss = ss.strip()
-    v = ['%-6d %s' % (k+1,v) for k,v in enumerate([s for s in ss.split('\n')])]
-    print('\n'.join(v))
-    print()
-    return ss
+def slurp(f):
+    with open(f, 'r') as f: return f.read()
 
 if __name__ == '__main__':
-    #def fetch_src(dt):
-    #    return ''.join([e.source for es in dt for e in es.examples])
-    #import doctest, pudb
-    #finder = doctest.DocTestFinder()
-    #src = fetch_src(finder.find(PyCFG.gen_cfg))
-    #print("from pycfg import *\nimport pudb\npudb.set_trace()\n" + src)
-    import json
-    i = PyCFG()
-    v = i.gen_cfg(process("""
-def myfunc(x, y):
-    if x > y:
-       return True
-    return False
-
-x=100
-y=100
-while 1 > myfunc(x,y)+1:
-  if x == y:
-      continue
-  else:
-      x = x + 1
-  print(0)
-  if x is y:
-      break
-  print(1)
-print(2)
-    """))
-    #for k,v in CFGNode.cache.items():
-    #    print(k,v.to_json())
-print(CFGNode.to_dot())
+    parser = argparse.ArgumentParser()
+    parser.add_argument('pythonfile', help='The python file to be analyzed')
+    parser.add_argument('-d','--dots', action='store_true', help='generate a dot file')
+    args = parser.parse_args()
+    cfg = PyCFG()
+    v = cfg.gen_cfg(slurp(args.pythonfile).strip())
+    if args.dots:
+        print(CFGNode.to_dot())
+    else:
+        for k,v in CFGNode.cache.items():
+            j = v.to_json()
+            print('[', j['at'],',', [CFGNode.i(p).to_json()['at'] for p in j['parents']], ']')
