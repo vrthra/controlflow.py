@@ -280,9 +280,39 @@ class PyCFG:
         # for the just next node
         return myparent
 
+    def on_for(self, node, myparent):
+        #node.target in node.iter: node.body
+        test_node = CFGNode(parent=myparent, ast=ast.parse('for_enter(True if %s else False)' % astunparse.unparse(node.iter).strip()).body[0])
+        ast.copy_location(test_node, node)
+
+        # This is the exit node for the while loop.
+        exit_node = CFGNode(parent=test_node, ast=ast.parse('for_exit()').body[0])
+
+        # we attach the label node here so that break can find it.
+        test_node.exit_node = exit_node
+
+        extract_node = CFGNode(parent=test_node, ast=ast.parse('%s = %s.shift()' % (astunparse.unparse(node.target).strip(), astunparse.unparse(node.iter).strip())).body[0])
+        ast.copy_location(extract_node.ast_node, test_node.ast_node)
+
+        # now we evaluate the body, one at a time.
+        p1 = extract_node
+        for n in node.body:
+            p1 = self.walk(n, p1)
+
+        # the test node is looped back at the end of processing.
+        test_node.add_parent(p1)
+
+        # link label node back to the condition.
+        exit_node.add_parent(test_node)
+        exit_node.add_parent(p1)
+        ast.copy_location(exit_node.ast_node, node.body[-1])
+        return exit_node
+
+
     def on_while(self, node, myparent):
         # For a while, the earliest parent is the node.test
-        test_node = CFGNode(parent=myparent, ast=node.test)
+        test_node = CFGNode(parent=myparent, ast=ast.parse('while_enter(%s)' % astunparse.unparse(node.test).strip()).body[0])
+        ast.copy_location(test_node.ast_node, node.test)
         test_node = self.walk(node.test, test_node)
 
         # This is the exit node for the while loop.
