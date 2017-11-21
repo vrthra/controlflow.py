@@ -212,7 +212,7 @@ class PyCFG:
     The python CFG
     """
     def __init__(self):
-        self.founder = CFGNode(parent=None, ast=ast.parse('')) # sentinel
+        self.founder = CFGNode(parent=None, ast=ast.parse('start()').body[0]) # sentinel
         self.functions = {}
 
     def parse(self, src):
@@ -414,7 +414,10 @@ class PyCFG:
         5
         """
         node = self.parse(src)
-        return self.link_functions(self.walk(node, self.founder))
+        node = self.walk(node, self.founder)
+        self.last_node = CFGNode(parent=node, ast=ast.parse('stop()').body[0])
+        ast.copy_location(self.last_node.ast_node, node.ast_node)
+        return self.link_functions(self.last_node)
 
 def slurp(f):
     with open(f, 'r') as f: return f.read()
