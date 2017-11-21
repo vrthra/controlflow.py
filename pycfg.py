@@ -158,7 +158,7 @@ class CFGNode(dict):
             self.parents = [parent.rid]
         else:
             self.parents = []
-        self.calls = None
+        self.calls = []
         self.ast_node = ast
         self.rid  = CFGNode.registry
         CFGNode.cache[self.rid] = self
@@ -183,8 +183,8 @@ class CFGNode(dict):
         assert type(p) is CFGNode
         self.parents.extend([p.rid for p in ps])
 
-    def set_calls(self, func):
-        self.calls = func
+    def add_calls(self, func):
+        self.calls.append(func)
 
     def to_json(self):
         lineno = self.ast_node.lineno if hasattr(self.ast_node, 'lineno') else 0
@@ -286,7 +286,7 @@ class PyCFG:
         test_node = self.walk(node.test, test_node)
 
         # This is the exit node for the while loop.
-        exit_node = CFGNode(parent=test_node, ast=ast.parse('pass').body[0])
+        exit_node = CFGNode(parent=test_node, ast=ast.parse('while_exit()').body[0])
 
         # we attach the label node here so that break can find it.
         test_node.exit_node = exit_node
@@ -316,7 +316,7 @@ class PyCFG:
 
         # add a dummy
         last_body = node.orelse if node.orelse else node.body
-        exit_node = CFGNode(parent=g1, ast=ast.copy_location(ast.parse('pass').body[0], last_body[-1]))
+        exit_node = CFGNode(parent=g1, ast=ast.copy_location(ast.parse('if_exit()').body[0], last_body[-1]))
         exit_node.add_parent(g2)
         return exit_node
 
@@ -334,8 +334,11 @@ class PyCFG:
         return self.walk(node.operand, myparent)
 
     def on_call(self, node, myparent):
-        myparent.set_calls(node.func.id)
-        return myparent
+        p = myparent
+        for a in node.args:
+            p = self.walk(a, p)
+        myparent.add_calls(node.func.id)
+        return p
 
     def on_expr(self, node, myparent):
         p = CFGNode(parent=myparent, ast=node)
@@ -349,9 +352,9 @@ class PyCFG:
         args = node.args
         returns = node.returns
 
-        enter_node = CFGNode(parent=None, ast=ast.parse('pass').body[0]) # sentinel
+        enter_node = CFGNode(parent=None, ast=ast.parse(node.name + '_enter()').body[0]) # sentinel
         ast.copy_location(enter_node.ast_node, node)
-        exit_node = CFGNode(parent=None, ast=ast.parse('pass').body[0]) # sentinel
+        exit_node = CFGNode(parent=None, ast=ast.parse(node.name + '_exit()').body[0]) # sentinel
 
         p = enter_node
         for n in node.body:
@@ -366,10 +369,11 @@ class PyCFG:
     def link_functions(self, graph):
         for k,v in CFGNode.cache.items():
             if v.calls:
-                if v.calls in self.functions:
-                    enter, exit = self.functions[v.calls]
-                    enter.add_parent(v)
-                    v.add_parent(exit)
+                for calls in v.calls:
+                    if calls in self.functions:
+                        enter, exit = self.functions[calls]
+                        enter.add_parent(v)
+                        v.add_parent(exit)
         return graph
 
 
