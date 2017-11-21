@@ -354,11 +354,13 @@ if __name__ == '__main__':
     3|while x>y:
     4|  if x == y:
     5|      continue
-    6|  print(0)
-    7|  if x is y:
-    8|      break
-    9|  print(1)
-   10|print(2)
+    6|  else:
+    7|      x = x + 1
+    8|  print(0)
+    9|  if x is y:
+   10|      break
+   11|  print(1)
+   12|print(2)
     """))
     #for k,v in CFGNode.cache.items():
     #    print(k,v.to_json())
