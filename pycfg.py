@@ -423,12 +423,25 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('pythonfile', help='The python file to be analyzed')
     parser.add_argument('-d','--dots', action='store_true', help='generate a dot file')
+    parser.add_argument('-c','--children', action='store_true', help='print children')
+    parser.add_argument('-p','--parents', action='store_true', help='print parents')
     args = parser.parse_args()
     cfg = PyCFG()
     v = cfg.gen_cfg(slurp(args.pythonfile).strip())
     if args.dots:
         print(CFGNode.to_dot())
-    else:
+    elif args.children:
+        # condition analysis
+        children = {}
+        for k,v in CFGNode.cache.items():
+            for p in v.parents:
+                children.setdefault(p,[]).append(k)
+        for k,v in children.items():
+            j = CFGNode.i(k).to_json()
+            print('[', j['at'],',', [CFGNode.i(c).to_json()['at'] for c in v], ']')
+
+    elif args.parents:
         for k,v in CFGNode.cache.items():
             j = v.to_json()
             print('[', j['at'],',', [CFGNode.i(p).to_json()['at'] for p in j['parents']], ']')
+
