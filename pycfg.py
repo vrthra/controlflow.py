@@ -150,6 +150,7 @@ import pygraphviz
 class CFGNode(dict):
     registry = 0
     cache = {}
+    stack = []
     def __init__(self, parent=None, ast=None):
         if parent is not None:
             assert type(parent) is CFGNode
@@ -211,6 +212,7 @@ class PyCFG:
     """
     def __init__(self):
         self.founder = CFGNode(parent=None, ast=ast.parse('')) # sentinel
+        self.functions = {}
 
     def parse(self, src):
         return ast.parse(src)
@@ -280,6 +282,7 @@ class PyCFG:
     def on_while(self, node, myparent):
         # For a while, the earliest parent is the node.test
         test_node = CFGNode(parent=myparent, ast=node.test)
+        test_node = self.walk(node.test, test_node)
 
         # This is the exit node for the while loop.
         # TODO: set the location to be last line of the while.
@@ -315,14 +318,56 @@ class PyCFG:
         exit_node.add_parent(g2)
         return exit_node
 
+    def on_binop(self, node, myparent):
+        left = self.walk(node.left, myparent)
+        right = self.walk(node.right, left)
+        return right
+
+    def on_compare(self, node, myparent):
+        left = self.walk(node.left, myparent)
+        right = self.walk(node.comparators[0], left)
+        return right
+
+    def on_unaryop(self, node, myparent):
+        return self.walk(node.operand, myparent)
+
     def on_call(self, node, myparent):
-        for g in myparent:
-            g.set_calls(node.func.id)
+        myparent.set_calls(node.func.id)
         return myparent
 
     def on_expr(self, node, myparent):
         p = CFGNode(parent=myparent, ast=node)
         return self.walk(node.value, p)
+
+    def on_functiondef(self, node, myparent):
+        # a function definition does not actually continue the thread of
+        # control flow
+        # name, args, body, decorator_list, returns
+        fname = node.name
+        args = node.args
+        returns = node.returns
+
+        enter_node = CFGNode(parent=None, ast=ast.parse('')) # sentinel
+        exit_node = CFGNode(parent=None, ast=ast.parse('')) # sentinel
+
+        p = enter_node
+        for n in node.body:
+            p = self.walk(n, p)
+        exit_node.add_parent(p)
+
+        self.functions[fname] = [enter_node, exit_node]
+
+        return myparent
+
+    def link_functions(self, graph):
+        for k,v in CFGNode.cache.items():
+            if v.calls:
+                if v.calls in self.functions:
+                    enter, exit = self.functions[v.calls]
+                    enter.add_parent(v)
+                    v.add_parent(exit)
+        return graph
+
 
     def gen_cfg(self, src):
         """
@@ -332,7 +377,7 @@ class PyCFG:
         """
         #try:
         node = self.parse(src)
-        return self.walk(node, self.founder)
+        return self.link_functions(self.walk(node, self.founder))
         #except Exception as e:
         #    print(e)
 
@@ -340,10 +385,11 @@ def trimcolon(ss):
     return '\n'.join([s.strip().split('|')[1] for s in ss.split('\n') if s.strip()])
 
 def process(ss):
-    v = ['%-6d %s' % (k+1,v) for k,v in enumerate([s for s in ss.split('\n') if s.strip()])]
+    ss = ss.strip()
+    v = ['%-6d %s' % (k+1,v) for k,v in enumerate([s for s in ss.split('\n')])]
     print('\n'.join(v))
     print()
-    return ss.strip()
+    return ss
 
 if __name__ == '__main__':
     #def fetch_src(dt):
@@ -355,9 +401,14 @@ if __name__ == '__main__':
     import json
     i = PyCFG()
     v = i.gen_cfg(process("""
+def myfunc(x, y):
+    if x > y:
+       return True
+    return False
+
 x=100
 y=100
-while x>y:
+while 1 > myfunc(x,y)+1:
   if x == y:
       continue
   else:
