@@ -144,154 +144,182 @@ import sys
 import operator
 import json
 import astunparse
+import pygraphviz
 
 class CFGNode(dict):
-    registry = 1
+    registry = 0
     cache = {}
-    def __init__(self, parents=[], ast=None):
-        self.parents = [p.rid for p in parents]
-        self.children = []
+    def __init__(self, parent=None, ast=None):
+        if parent is not None:
+            assert type(parent) is CFGNode
+            self.parents = [parent.rid]
+        else:
+            self.parents = []
+        self.calls = None
         self.ast_node = ast
         self.rid  = CFGNode.registry
-        self.calls = None
-        CFGNode.registry += 1
         CFGNode.cache[self.rid] = self
+        CFGNode.registry += 1
 
     @classmethod
     def i(cls, i):
         return cls.cache[i]
 
     def __str__(self):
-        return "id:%d parents: %s src[%d]: %s" % (self.rid, str(self.parents), self.ast_node.lineno, astunparse.unparse(self.ast_node).strip())
+        lineno = self.ast_node.lineno if hasattr(self.ast_node, 'lineno') else 0
+        return "id:%d parents: %s src[%d]: %s" % (self.rid, str(self.parents), lineno, astunparse.unparse(self.ast_node).strip())
 
     def __repr__(self):
         return str(self)
 
-    def add_from(self, g):
-        self.parents.extend([g.rid for g in g])
+    def add_parent(self, p):
+        assert type(p) is CFGNode
+        self.parents.append(p.rid)
+
+    def add_parents(self, ps):
+        assert type(p) is CFGNode
+        self.parents.extend([p.rid for p in ps])
 
     def set_calls(self, func):
         self.calls = func
 
     def to_json(self):
-        return {'id':self.rid, 'parents': self.parents, 'calls': self.calls, 'at':self.ast_node.lineno ,'ast':astunparse.unparse(self.ast_node).strip()}
+        lineno = self.ast_node.lineno if hasattr(self.ast_node, 'lineno') else 0
+        return {'id':self.rid, 'parents': self.parents, 'calls': self.calls, 'at':lineno ,'ast':astunparse.unparse(self.ast_node).strip()}
 
     def to_jsonx(self):
-        return {'id':self.rid, 'parents': [CFGNode.cache[p].to_jsonx() for p in self.parents], 'calls':self.calls, 'at':self.ast_node.lineno, 'ast':astunparse.unparse(self.ast_node).strip()}
+        lineno = self.ast_node.lineno if hasattr(self.ast_node, 'lineno') else 0
+        return {'id':self.rid, 'parents': [CFGNode.i(p).to_jsonx() for p in self.parents], 'calls':self.calls, 'at':lineno, 'ast':astunparse.unparse(self.ast_node).strip()}
 
+    @classmethod
+    def to_dot(cls):
+        G = pygraphviz.AGraph(directed=True)
+        for k, v in CFGNode.cache.items():
+            G.add_node(k)
+            n = G.get_node(k)
+            cnode = CFGNode.i(k)
+            lineno = cnode.ast_node.lineno if hasattr(cnode.ast_node, 'lineno') else 0
+            n.attr['label'] = "%d: %s" % (lineno, astunparse.unparse(cnode.ast_node).strip())
+            if cnode.parents:
+                for i in cnode.parents:
+                    G.add_edge(i, k)
+        print(G.string())
 class PyCFG:
     """
     The python CFG
     """
     def __init__(self):
-        self.graph = [] # sentinel
+        self.founder = CFGNode(parent=None, ast=ast.parse('')) # sentinel
 
     def parse(self, src):
         return ast.parse(src)
 
-    def walk(self, node, graph):
+    def walk(self, node, myparent):
         if node is None: return
-        res = "on_%s" % node.__class__.__name__.lower()
-        if hasattr(self, res):
-            v = getattr(self,res)
-            return v(node, graph)
+        fname = "on_%s" % node.__class__.__name__.lower()
+        if hasattr(self, fname):
+            fn = getattr(self, fname)
+            return fn(node, myparent)
         else:
-            return graph
+            return myparent
 
-    def on_module(self, node, graph):
+    def on_module(self, node, myparent):
         """
         Module(stmt* body)
         """
         # each time a statement is executed unconditionally, make a link from
         # the result to next statement
-        g = graph
+        p = myparent
         for n in node.body:
-            g = self.walk(n, g)
-        return g
+            p = self.walk(n, p)
+        return p
 
-    def on_assign(self, node, graph):
+    def on_assign(self, node, myparent):
         """
         Assign(expr* targets, expr value)
         TODO: AugAssign(expr target, operator op, expr value)
         -- 'simple' indicates that we annotate simple name without parens
         TODO: AnnAssign(expr target, expr annotation, expr? value, int simple)
         """
-        graph = [CFGNode(parents=graph, ast=node)]
         if len(node.targets) > 1: raise NotImplemented('Parallel assignments')
-        return graph
 
-    def on_return(self, node, graph):
-        graph = [CFGNode(parents=graph, ast=node)]
-        return graph
+        return CFGNode(parent=myparent, ast=node)
 
-    def on_break(self, node, graph):
-        parent = graph[0].parents[0]
+    def on_return(self, node, myparent):
+        return CFGNode(parent=myparent, ast=node)
+
+    def on_break(self, node, myparent):
+        parent = myparent.parents[0]
         while not hasattr(CFGNode.i(parent), 'exit_node'):
             # we have ordered parents
-            parent, = CFGNode.i(parent).parents
+            parent = CFGNode.i(parent).parents[0]
 
         assert hasattr(CFGNode.i(parent), 'exit_node')
-        graph = [CFGNode(parents=graph, ast=node)]
+        p = CFGNode(parent=myparent, ast=node)
 
         # make the break one of the parents of label node.
-        CFGNode.i(parent).exit_node.add_from(graph)
-        return graph
+        CFGNode.i(parent).exit_node.add_parent(p)
 
-    def on_continue(self, node, graph):
-        parent, = graph[0].parents
+        return p
+
+    def on_continue(self, node, myparent):
+        parent = myparent.parents[0]
         while not hasattr(CFGNode.i(parent), 'exit_node'):
             # we have ordered parents
-            parent, = CFGNode[parent].parents
+            parent = CFGNode.i(parent).parents[0]
         assert hasattr(CFGNode.i(parent), 'exit_node')
-        graph = [CFGNode(parents=graph, ast=node)]
+        p = CFGNode(parent=myparent, ast=node)
 
         # make continue one of the parents of the original test node.
-        CFGNode.i(parent).add_from(graph)
-        return graph
+        CFGNode.i(parent).add_parent(p)
+        return p
 
-    def on_while(self, node, graph):
+    def on_while(self, node, myparent):
         # For a while, the earliest parent is the node.test
-        test_node = CFGNode(parents=graph, ast=node.test)
-        graph = [test_node]
+        test_node = CFGNode(parent=myparent, ast=node.test)
 
         # This is the exit node for the while loop.
         # TODO: set the location to be last line of the while.
-        exit_node = CFGNode(parents=graph, ast=ast.copy_location(ast.parse('pass').body[0], node))
+        exit_node = CFGNode(parent=test_node, ast=ast.copy_location(ast.parse('pass').body[0], node))
 
         # we attach the label node here so that break can find it.
         test_node.exit_node = exit_node
 
         # now we evaluate the body, one at a time.
-        g1 = graph
+        p1 = test_node
         for n in node.body:
-            g1 = self.walk(n, g1)
+            p1 = self.walk(n, p1)
 
         # the test node is looped back at the end of processing.
-        test_node.add_from(g1)
+        test_node.add_parent(p1)
 
         # link label node back to the condition.
-        exit_node.add_from(graph)
-        return [exit_node]
+        exit_node.add_parent(test_node)
+        exit_node.add_parent(p1)
+        return exit_node
 
-    def on_if(self, node, graph):
-        graph = [CFGNode(parents=graph, ast=node.test)]
-        g1 = graph
+    def on_if(self, node, myparent):
+        myparent = CFGNode(parent=myparent, ast=node.test)
+        g1 = myparent
         for n in node.body:
             g1 = self.walk(n, g1)
-        g2 = graph
+        g2 = myparent
         for n in node.orelse:
             g2 = self.walk(n, g2)
-        return g1+g2
 
-    def on_call(self, node, graph):
-        #graph = [CFGNode(parents=graph, ast=node)]
-        for g in graph:
+        # add a dummy
+        exit_node = CFGNode(parent=g1, ast=ast.copy_location(ast.parse('pass').body[0], node))
+        exit_node.add_parent(g2)
+        return exit_node
+
+    def on_call(self, node, myparent):
+        for g in myparent:
             g.set_calls(node.func.id)
-        return graph
+        return myparent
 
-    def on_expr(self, node, graph):
-        graph = [CFGNode(parents=graph, ast=node)]
-        return self.walk(node.value, graph)
+    def on_expr(self, node, myparent):
+        p = CFGNode(parent=myparent, ast=node)
+        return self.walk(node.value, p)
 
     def gen_cfg(self, src):
         """
@@ -301,7 +329,7 @@ class PyCFG:
         """
         #try:
         node = self.parse(src)
-        return self.walk(node, self.graph)
+        return self.walk(node, self.founder)
         #except Exception as e:
         #    print(e)
 
