@@ -99,7 +99,7 @@ def compute_dominator(dominator, cfg, start = 0, key='parents'):
 
 def a_control_dependent_on_b(a, b, cfg, dom, postdom):
     # A has at least 2 successors in CFG
-    if len(cfg[a].children) < 2: return False
+    if len(cfg[a]['children']) < 2: return False
 
     # B dominates A
     if a not in dom[b]: return False
@@ -108,8 +108,15 @@ def a_control_dependent_on_b(a, b, cfg, dom, postdom):
     if b in postdom[a]: return False
 
     # there exist a successor for B that is post dominated by A
-    successors = cfg[b].children
+    successors = cfg[b]['children']
     return any(s in postdom[a] for s in successors)
+
+def approach_level(path, cfg, dom, postdom):
+    if not path: return 0
+    hd, *tl = path
+    if not tl: return 0
+    cost = 1 if a_control_dependent_on_b(hd, tl[0], cfg, dom, postdom) else 0
+    return cost + approach_level(tl, cfg, dom, postdom)
 
 if __name__ == '__main__':
     cov = coverage.Coverage(branch=True)
@@ -142,3 +149,7 @@ if __name__ == '__main__':
     parents = cfg[target]['parents']
     bd = min(branch_distance(p, target, cfg, set()) for p in parents)
     print('branch distance(target:%d): %d' % (target, bd))
+
+    path = [int(i) for i in sys.argv[2:]]
+    al = approach_level(path, cfg, dom, pdom)
+    print('approach level(%s): %d' % (path, al))
