@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 def gcd(a, b):
-    if a<b:
+    if a < b:
         c = a
         a = b
         b = c
 
-    while b != 0 :
+    while b != 0:
         c = a
         a = b
         b = c % b

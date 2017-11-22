@@ -2,17 +2,53 @@
 #cov.set_option("run:branch", True)
 
 import coverage
+import inspect
 import sys
 import json
 import example
 import pycfg
 import math
+import ast
+import expr
 
-def compute_predicate_cost(parent, target, branch_cov, cfg):
-    # The cost of a critical
-    return 1
+global prevline
+prevline = 0
+global cdata_arcs
+cdata_arcs = []
+global branch_cov
+branch_cov = {}
+global source_code
+source_code = {}
 
-def branch_distance(parent, target, cfg, branch_cov, seen):
+def traceit(frame, event, arg):
+    global prevline
+    if event in ['call', 'return', 'line']: # 'exception'
+        line = frame.f_lineno
+        mylocals = frame.f_locals
+        f = inspect.getframeinfo(frame)
+        src = f.code_context[f.index].strip()
+        ssrc = None
+        myast = None
+        if src.startswith('if ') and src.endswith(':'):
+            ssrc = src[3:-1].strip()
+        elif src.startswith('while ') and src.endswith(':'):
+            ssrc = src[5:-1].strip()
+        cdata_arcs.append((prevline, line, ssrc, mylocals))
+        prevline = line
+    else: pass
+    return traceit
+
+
+def compute_predicate_cost(parent, target, cfg):
+    global branch_cov
+    global source_code
+    src, l = source_code[parent]
+    ei = expr.ExprInterpreter(l)
+    v = ei.eval(src)
+    return v
+
+def branch_distance(parent, target, cfg, seen):
+    global branch_cov
     seen.add(target)
     parent_dict = cfg[parent]
 
@@ -25,7 +61,7 @@ def branch_distance(parent, target, cfg, branch_cov, seen):
         if target in branch_cov[parent]: return 0
 
         # the target was not executed. Hence the flow diverged here.
-        return compute_predicate_cost(parent, target, branch_cov, cfg)
+        return compute_predicate_cost(parent, target, cfg)
 
     else: # The parent was not executed. So go up the chain
 
@@ -33,7 +69,7 @@ def branch_distance(parent, target, cfg, branch_cov, seen):
         if not gparents: return math.inf
 
         # go up the minimum chain.
-        path_cost = min(branch_distance(gp, parent, cfg, branch_cov, seen) for gp in gparents)
+        path_cost = min(branch_distance(gp, parent, cfg, seen) for gp in gparents)
 
         is_conditional = len(cfg[target]['children']) > 1
         # the cost of missing a conditional is 1 and that of a non-conditional is 0
@@ -41,22 +77,32 @@ def branch_distance(parent, target, cfg, branch_cov, seen):
 
         return path_cost + node_cost
 
-
 if __name__ == '__main__':
     cov = coverage.Coverage(branch=True)
+
+    #cdata = cov.get_data()
+    #cdata.read_file('example.coverage')
+    #cdata_arcs = cdata.arcs(cdata.measured_files()[0])
+
     #cov.start()
     #example.gcd(15,12)
     #cov.stop()
-    cdata = cov.get_data()
-    cdata.read_file('example.coverage')
-    cdata_arcs = cdata.arcs(cdata.measured_files()[0])
-    branch_cov = {}
 
-    for i,j in cdata_arcs:
+    sys.settrace(traceit)
+    example.gcd(15,12)
+    sys.settrace(None)
+
+    # print(cdata_arcs)
+
+    for i,j,src,l in cdata_arcs:
         branch_cov.setdefault(i, []).append(j)
+        source_code[j] = (src, l)
+
+    #import pudb
+    #pudb.set_trace()
 
     cfg = dict(pycfg.get_cfg('example.py'))
     target = int(sys.argv[1])
     parents = cfg[target]['parents']
-    bd = min(branch_distance(p, target, cfg, branch_cov, set()) for p in parents)
+    bd = min(branch_distance(p, target, cfg, set()) for p in parents)
     print('branch distance(target:%d): %d' % (target, bd))
