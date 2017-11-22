@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 def gcd(a, b):
     if a<b:
         c = a
@@ -10,4 +11,5 @@ def gcd(a, b):
         b = c % b
     return a
 
-print(gcd(12, 15))
+if __name__ == '__main__':
+    gcd(12, 15)

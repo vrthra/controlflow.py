@@ -422,6 +422,28 @@ class PyCFG:
 def slurp(f):
     with open(f, 'r') as f: return f.read()
 
+def get_child_graph(pythonfile):
+    cfg = PyCFG()
+    v = cfg.gen_cfg(slurp(pythonfile).strip())
+    children = {}
+    for k,v in CFGNode.cache.items():
+        for p in v.parents:
+            children.setdefault(p,[]).append(k)
+    g = []
+    for k,v in children.items():
+        j = CFGNode.i(k).to_json()
+        g.append([j['at'],[CFGNode.i(c).to_json()['at'] for c in v]])
+    return g
+
+def get_parent_graph(pythonfile):
+    cfg = PyCFG()
+    v = cfg.gen_cfg(slurp(pythonfile).strip())
+    g = []
+    for k,v in CFGNode.cache.items():
+        j = v.to_json()
+        g.append([j['at'],[CFGNode.i(p).to_json()['at'] for p in j['parents']]])
+    return g
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('pythonfile', help='The python file to be analyzed')
@@ -429,22 +451,13 @@ if __name__ == '__main__':
     parser.add_argument('-c','--children', action='store_true', help='print children')
     parser.add_argument('-p','--parents', action='store_true', help='print parents')
     args = parser.parse_args()
-    cfg = PyCFG()
-    v = cfg.gen_cfg(slurp(args.pythonfile).strip())
     if args.dots:
+        cfg = PyCFG()
+        v = cfg.gen_cfg(slurp(args.pythonfile).strip())
         print(CFGNode.to_dot())
     elif args.children:
-        # condition analysis
-        children = {}
-        for k,v in CFGNode.cache.items():
-            for p in v.parents:
-                children.setdefault(p,[]).append(k)
-        for k,v in children.items():
-            j = CFGNode.i(k).to_json()
-            print('[', j['at'],',', [CFGNode.i(c).to_json()['at'] for c in v], ']')
+        for i in get_child_graph(args.pythonfile): print(i)
 
     elif args.parents:
-        for k,v in CFGNode.cache.items():
-            j = v.to_json()
-            print('[', j['at'],',', [CFGNode.i(p).to_json()['at'] for p in j['parents']], ']')
+        for i in get_parent_graph(args.pythonfile): print(i)
 
