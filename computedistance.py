@@ -9,6 +9,7 @@ import pycfg
 import math
 
 def compute_cost(parent, target, arcs, pdict):
+    # The cost of a critical
     return 1
 
 def branch_distance(parent, target, pdict, arcs, seen):
@@ -31,7 +32,8 @@ def branch_distance(parent, target, pdict, arcs, seen):
     if (parent, target) in arcs: return 0
 
     # we were not executed. So, where did the flow diverge? Is it here?
-    if target in all_targets:
+    # a divergence happens if parent is executed, but target is not
+    if parent in all_parents:
         return compute_cost(parent, target, arcs, pdict)
 
     # if we can not go further up, we dont know how close we came
@@ -40,8 +42,9 @@ def branch_distance(parent, target, pdict, arcs, seen):
     # so go up the chain.
     pcost = min(branch_distance(gp, parent, pdict, arcs, seen) for gp in gparents)
 
+    is_conditional = len(pdict[target]['children']) > 1
     # the cost of missing a conditional is 1 and that of a non-conditional is 0
-    cost = 1 if len(pdict[target]['children']) > 1 else 0
+    cost = 1 if is_conditional else 0
 
     return pcost + cost
 
@@ -56,5 +59,7 @@ if __name__ == '__main__':
     f = cdata.measured_files()[0]
     arcs = cdata.arcs(f)
     cfg = dict(pycfg.get_cfg('example.py'))
-    parent, target = int(sys.argv[1]),int(sys.argv[2])
-    print('branch distance(parent:%d, target:%d): %d'%(parent, target, branch_distance(parent, target, cfg, arcs, set())))
+    target = int(sys.argv[1])
+    parents = cfg[target]['parents']
+    bd = min(branch_distance(p, target, cfg, arcs, set()) for p in parents)
+    print('branch distance(target:%d): %d' % (target, bd))
