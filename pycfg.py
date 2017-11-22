@@ -286,11 +286,11 @@ class PyCFG:
 
     def on_for(self, node, myparent):
         #node.target in node.iter: node.body
-        test_node = CFGNode(parent=myparent, ast=ast.parse('for_enter(True if %s else False)' % astunparse.unparse(node.iter).strip()).body[0])
+        test_node = CFGNode(parent=myparent, ast=ast.parse('for_enter: True if %s else False' % astunparse.unparse(node.iter).strip()).body[0])
         ast.copy_location(test_node, node)
 
         # This is the exit node for the while loop.
-        exit_node = CFGNode(parent=test_node, ast=ast.parse('for_exit()').body[0])
+        exit_node = CFGNode(parent=test_node, ast=ast.parse('for_exit').body[0])
 
         # we attach the label node here so that break can find it.
         test_node.exit_node = exit_node
@@ -315,12 +315,12 @@ class PyCFG:
 
     def on_while(self, node, myparent):
         # For a while, the earliest parent is the node.test
-        test_node = CFGNode(parent=myparent, ast=ast.parse('while_enter(%s)' % astunparse.unparse(node.test).strip()).body[0])
+        test_node = CFGNode(parent=myparent, ast=ast.parse('while_enter: %s' % astunparse.unparse(node.test).strip()).body[0])
         ast.copy_location(test_node.ast_node, node.test)
         test_node = self.walk(node.test, test_node)
 
         # This is the exit node for the while loop.
-        exit_node = CFGNode(parent=test_node, ast=ast.parse('while_exit()').body[0])
+        exit_node = CFGNode(parent=test_node, ast=ast.parse('while_exit').body[0])
 
         # we attach the label node here so that break can find it.
         test_node.exit_node = exit_node
@@ -340,7 +340,8 @@ class PyCFG:
         return exit_node
 
     def on_if(self, node, myparent):
-        myparent = CFGNode(parent=myparent, ast=node.test)
+        myparent = CFGNode(parent=myparent, ast=ast.parse('if_enter: %s' % astunparse.unparse(node.test).strip()).body[0])
+        ast.copy_location(myparent.ast_node, node.test)
         g1 = myparent
         for n in node.body:
             g1 = self.walk(n, g1)
@@ -350,7 +351,7 @@ class PyCFG:
 
         # add a dummy
         last_body = node.orelse if node.orelse else node.body
-        exit_node = CFGNode(parent=g1, ast=ast.copy_location(ast.parse('if_exit()').body[0], last_body[-1]))
+        exit_node = CFGNode(parent=g1, ast=ast.copy_location(ast.parse('if_exit').body[0], last_body[-1]))
         exit_node.add_parent(g2)
         return exit_node
 
@@ -386,9 +387,9 @@ class PyCFG:
         args = node.args
         returns = node.returns
 
-        enter_node = CFGNode(parent=None, ast=ast.parse(node.name + '_enter()').body[0]) # sentinel
+        enter_node = CFGNode(parent=None, ast=ast.parse(node.name + '_enter').body[0]) # sentinel
         ast.copy_location(enter_node.ast_node, node)
-        exit_node = CFGNode(parent=None, ast=ast.parse(node.name + '_exit()').body[0]) # sentinel
+        exit_node = CFGNode(parent=None, ast=ast.parse(node.name + '_exit').body[0]) # sentinel
 
         p = enter_node
         for n in node.body:
