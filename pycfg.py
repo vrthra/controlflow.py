@@ -216,7 +216,8 @@ class PyCFG:
     The python CFG
     """
     def __init__(self):
-        self.founder = CFGNode(parent=None, ast=ast.parse('start()').body[0]) # sentinel
+        self.founder = CFGNode(parent=None, ast=ast.parse('start').body[0]) # sentinel
+        self.founder.ast_node.lineno = 0
         self.functions = {}
 
     def parse(self, src):
