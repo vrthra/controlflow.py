@@ -10,6 +10,7 @@ show:
 coverage:
 	python3 -mcoverage run --branch example.py
 	python3 -mcoverage report
+	mv .coverage example.coverage
 
 xml:
 	python3 -mcoverage xml

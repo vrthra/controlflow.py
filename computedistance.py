@@ -8,45 +8,38 @@ import example
 import pycfg
 import math
 
-def compute_cost(parent, target, arcs, pdict):
+def compute_predicate_cost(parent, target, branch_cov, cfg):
     # The cost of a critical
     return 1
 
-def branch_distance(parent, target, pdict, arcs, seen):
-    all_parents = [i for (i,j) in arcs]
-    all_targets = [j for (i,j) in arcs]
-    # any target, parent is a pair of line numbers.
-    # go up the child->parent chain until
-    # we get a target branch pair with (condition, next statement).
-    # to compute branch distance, we look up if this pair exists in the cdata.arcs.
-    # if not, retrieve condition's parents, and for each parent:
-    # see if it is a condition. If it is not, get its grand parent
-    # resulting in another pair with (condition, stmt) see if it is in cdata.arcs
-    # and continue
+def branch_distance(parent, target, cfg, branch_cov, seen):
     seen.add(target)
-    parent_dict = pdict[parent]
+    parent_dict = cfg[parent]
 
     gparents = [p for p in parent_dict['parents'] if p not in seen]
 
-    # if we were executed, then there is no cost
-    if (parent, target) in arcs: return 0
+    # was the parent executed?
+    if parent in branch_cov:
+        # the parent was executed. Hence, if the target is executed
+        # then there is no cost.
+        if target in branch_cov[parent]: return 0
 
-    # we were not executed. So, where did the flow diverge? Is it here?
-    # a divergence happens if parent is executed, but target is not
-    if parent in all_parents:
-        return compute_cost(parent, target, arcs, pdict)
+        # the target was not executed. Hence the flow diverged here.
+        return compute_predicate_cost(parent, target, branch_cov, cfg)
 
-    # if we can not go further up, we dont know how close we came
-    if not gparents: return math.inf
+    else: # The parent was not executed. So go up the chain
 
-    # so go up the chain.
-    pcost = min(branch_distance(gp, parent, pdict, arcs, seen) for gp in gparents)
+        # if we can not go further up, we dont know how close we came
+        if not gparents: return math.inf
 
-    is_conditional = len(pdict[target]['children']) > 1
-    # the cost of missing a conditional is 1 and that of a non-conditional is 0
-    cost = 1 if is_conditional else 0
+        # go up the minimum chain.
+        path_cost = min(branch_distance(gp, parent, cfg, branch_cov, seen) for gp in gparents)
 
-    return pcost + cost
+        is_conditional = len(cfg[target]['children']) > 1
+        # the cost of missing a conditional is 1 and that of a non-conditional is 0
+        node_cost = 1 if is_conditional else 0
+
+        return path_cost + node_cost
 
 
 if __name__ == '__main__':
@@ -56,10 +49,14 @@ if __name__ == '__main__':
     #cov.stop()
     cdata = cov.get_data()
     cdata.read_file('example.coverage')
-    f = cdata.measured_files()[0]
-    arcs = cdata.arcs(f)
+    cdata_arcs = cdata.arcs(cdata.measured_files()[0])
+    branch_cov = {}
+
+    for i,j in cdata_arcs:
+        branch_cov.setdefault(i, []).append(j)
+
     cfg = dict(pycfg.get_cfg('example.py'))
     target = int(sys.argv[1])
     parents = cfg[target]['parents']
-    bd = min(branch_distance(p, target, cfg, arcs, set()) for p in parents)
+    bd = min(branch_distance(p, target, cfg, branch_cov, set()) for p in parents)
     print('branch distance(target:%d): %d' % (target, bd))
