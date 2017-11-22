@@ -443,6 +443,7 @@ def get_cfg(pythonfile):
         children_at = [cache[c].to_json()['at'] for c in j['children']]
         if at not in g:
             g[at] = {'parents':set(), 'children':set()}
+        # remove dummy nodes
         ps = set([p for p in parents_at if p != at])
         cs = set([c for c in children_at if c != at])
         g[at]['parents'] |= ps
