@@ -439,10 +439,12 @@ def get_cfg(pythonfile):
     for k,v in cache.items():
         j = v.to_json()
         at = j['at']
+        parents_at = [cache[p].to_json()['at'] for p in j['parents']]
+        children_at = [cache[c].to_json()['at'] for c in j['children']]
         if at not in g:
             g[at] = {'parents':set(), 'children':set()}
-        ps = set([cache[p].to_json()['at'] for p in j['parents'] if p != at])
-        cs = set([cache[c].to_json()['at'] for c in j['children'] if c != at])
+        ps = set([p for p in parents_at if p != at])
+        cs = set([c for c in children_at if c != at])
         g[at]['parents'] |= ps
         g[at]['children'] |= cs
     return g
