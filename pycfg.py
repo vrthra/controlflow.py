@@ -159,6 +159,7 @@ class CFGNode(dict):
         else:
             self.parents = []
         self.calls = []
+        self.children = []
         self.ast_node = ast
         self.rid  = CFGNode.registry
         CFGNode.cache[self.rid] = self
@@ -175,24 +176,27 @@ class CFGNode(dict):
     def __repr__(self):
         return str(self)
 
+    def add_child(self, c):
+        assert type(c) is int
+        if c not in self.children:
+            self.children.append(c)
+
     def add_parent(self, p):
         assert type(p) is CFGNode
-        self.parents.append(p.rid)
+        if p not in self.parents:
+            self.parents.append(p.rid)
 
     def add_parents(self, ps):
         assert type(p) is CFGNode
-        self.parents.extend([p.rid for p in ps])
+        for p in ps:
+            self.add_parent(p.rid)
 
     def add_calls(self, func):
         self.calls.append(func)
 
     def to_json(self):
         lineno = self.ast_node.lineno if hasattr(self.ast_node, 'lineno') else 0
-        return {'id':self.rid, 'parents': self.parents, 'calls': self.calls, 'at':lineno ,'ast':astunparse.unparse(self.ast_node).strip()}
-
-    def to_jsonx(self):
-        lineno = self.ast_node.lineno if hasattr(self.ast_node, 'lineno') else 0
-        return {'id':self.rid, 'parents': [CFGNode.i(p).to_jsonx() for p in self.parents], 'calls':self.calls, 'at':lineno, 'ast':astunparse.unparse(self.ast_node).strip()}
+        return {'id':self.rid, 'parents': self.parents, 'children': self.children, 'calls': self.calls, 'at':lineno ,'ast':astunparse.unparse(self.ast_node).strip()}
 
     @classmethod
     def to_dot(cls):
@@ -396,7 +400,7 @@ class PyCFG:
 
         return myparent
 
-    def link_functions(self, graph):
+    def link_functions(self):
         for k,v in CFGNode.cache.items():
             if v.calls:
                 for calls in v.calls:
@@ -404,8 +408,11 @@ class PyCFG:
                         enter, exit = self.functions[calls]
                         enter.add_parent(v)
                         v.add_parent(exit)
-        return graph
 
+    def update_children(self):
+        for k,v in CFGNode.cache.items():
+            for p in v.parents:
+                CFGNode.cache[p].add_child(k)
 
     def gen_cfg(self, src):
         """
@@ -417,47 +424,41 @@ class PyCFG:
         node = self.walk(node, self.founder)
         self.last_node = CFGNode(parent=node, ast=ast.parse('stop()').body[0])
         ast.copy_location(self.last_node.ast_node, node.ast_node)
-        return self.link_functions(self.last_node)
+        self.update_children()
+        self.link_functions()
 
 def slurp(f):
     with open(f, 'r') as f: return f.read()
 
-def get_child_graph(pythonfile):
-    cfg = PyCFG()
-    v = cfg.gen_cfg(slurp(pythonfile).strip())
-    children = {}
-    for k,v in CFGNode.cache.items():
-        for p in v.parents:
-            children.setdefault(p,[]).append(k)
-    g = []
-    for k,v in children.items():
-        j = CFGNode.i(k).to_json()
-        g.append([j['at'],[CFGNode.i(c).to_json()['at'] for c in v]])
-    return g
 
-def get_parent_graph(pythonfile):
+def get_cfg(pythonfile):
     cfg = PyCFG()
-    v = cfg.gen_cfg(slurp(pythonfile).strip())
-    g = []
-    for k,v in CFGNode.cache.items():
+    cfg.gen_cfg(slurp(pythonfile).strip())
+    cache = CFGNode.cache
+    g = {}
+    for k,v in cache.items():
         j = v.to_json()
-        g.append([j['at'],[CFGNode.i(p).to_json()['at'] for p in j['parents']]])
+        at = j['at']
+        if at not in g:
+            g[at] = {'parents':set(), 'children':set()}
+        ps = set([cache[p].to_json()['at'] for p in j['parents'] if p != at])
+        cs = set([cache[c].to_json()['at'] for c in j['children'] if c != at])
+        g[at]['parents'] |= ps
+        g[at]['children'] |= cs
     return g
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('pythonfile', help='The python file to be analyzed')
     parser.add_argument('-d','--dots', action='store_true', help='generate a dot file')
-    parser.add_argument('-c','--children', action='store_true', help='print children')
-    parser.add_argument('-p','--parents', action='store_true', help='print parents')
+    parser.add_argument('-c','--cfg', action='store_true', help='print cfg')
     args = parser.parse_args()
     if args.dots:
         cfg = PyCFG()
-        v = cfg.gen_cfg(slurp(args.pythonfile).strip())
+        cfg.gen_cfg(slurp(args.pythonfile).strip())
         print(CFGNode.to_dot())
-    elif args.children:
-        for i in get_child_graph(args.pythonfile): print(i)
-
-    elif args.parents:
-        for i in get_parent_graph(args.pythonfile): print(i)
+    elif args.cfg:
+        cfg = get_cfg(args.pythonfile)
+        for i in sorted(cfg):
+            print(i,'parents:', cfg[i]['parents'], 'children:', cfg[i]['children'])
 

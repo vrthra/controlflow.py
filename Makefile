@@ -1,11 +1,8 @@
 dots:
 	@python3  pycfg.py example.py -d
 
-parents:
-	@python3  pycfg.py example.py -p | sort -n -k2
-
-children:
-	@python3  pycfg.py example.py -c | sort -n -k2
+cfg:
+	@python3  pycfg.py example.py -c
 
 coverage:
 	python3 -mcoverage run --branch example.py

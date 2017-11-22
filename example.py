@@ -12,4 +12,4 @@ def gcd(a, b):
     return a
 
 if __name__ == '__main__':
-    gcd(12, 15)
+    gcd(15, 12)
