@@ -6,6 +6,7 @@ import sys
 import json
 import example
 import pycfg
+import math
 
 def branch_distance(target, pdict, arcs, seen):
     arc_first = [i for (i,j) in arcs]
@@ -18,11 +19,13 @@ def branch_distance(target, pdict, arcs, seen):
     # resulting in another pair with (condition, stmt) see if it is in cdata.arcs
     # and continue
     seen.add(target)
-    if target not in pdict: return 0
-    (parents, children), cost = pdict[target]
+    if target not in pdict: return math.inf
+    d, cost = pdict[target]
     if target in arc_second: return cost  # for now assumed to be 1, but need to compute from predicate
+    parents = [p for p in d['parents'] if p not in seen]
+    if not parents: return math.inf
 
-    return min(branch_distance(p, pdict, arcs, seen) for p in parents if p not in seen) + cost
+    return min(branch_distance(p, pdict, arcs, seen) for p in parents) + cost
 
 
 if __name__ == '__main__':
@@ -37,7 +40,7 @@ if __name__ == '__main__':
     cfg = dict(pycfg.get_cfg('example.py'))
     pdict = {}
     for k,v in cfg.items():
-        parents,children = v
+        children = v['children']
         if len(children) > 1:
             pdict[k] = (v, 1)
         else:

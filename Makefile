@@ -4,7 +4,7 @@ dots:
 cfg:
 	python3  pycfg.py example.py -c
 
-file:
+show:
 	nl -ba example.py
 
 coverage:
