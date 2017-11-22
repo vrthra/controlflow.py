@@ -464,4 +464,3 @@ if __name__ == '__main__':
         cfg = get_cfg(args.pythonfile)
         for i in sorted(cfg):
             print(i,'parents:', cfg[i]['parents'], 'children:', cfg[i]['children'])
-

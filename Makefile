@@ -2,7 +2,10 @@ dots:
 	@python3  pycfg.py example.py -d
 
 cfg:
-	@python3  pycfg.py example.py -c
+	python3  pycfg.py example.py -c
+
+file:
+	nl -ba example.py
 
 coverage:
 	python3 -mcoverage run --branch example.py
@@ -16,3 +19,7 @@ example:
 
 clean:
 	rm -rf .coverage
+
+I=1
+branch_distance:
+	python3 ./computedistance.py $(I)

@@ -20,7 +20,7 @@ def branch_distance(target, pdict, arcs, seen):
     seen.add(target)
     if target not in pdict: return 0
     (parents, children), cost = pdict[target]
-    if target in arc_second: return cost
+    if target in arc_second: return cost  # for now assumed to be 1, but need to compute from predicate
 
     return min(branch_distance(p, pdict, arcs, seen) for p in parents if p not in seen) + cost
 
