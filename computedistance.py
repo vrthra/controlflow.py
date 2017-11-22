@@ -80,9 +80,10 @@ def branch_distance(parent, target, cfg, seen):
 if __name__ == '__main__':
     cov = coverage.Coverage(branch=True)
 
+    trace = sys.gettrace()
     sys.settrace(traceit)
     example.gcd(15,12)
-    sys.settrace(None)
+    sys.settrace(trace)
 
     for i,j,src,l in cdata_arcs:
         branch_cov.setdefault(i, []).append(j)
