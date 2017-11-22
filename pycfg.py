@@ -335,13 +335,14 @@ class PyCFG:
         return _test_node.exit_nodes + test_node
 
     def on_if(self, node, myparents):
-        myparent = CFGNode(parents=myparents, ast=ast.parse('_if: %s' % astunparse.unparse(node.test).strip()).body[0])
-        ast.copy_location(myparent.ast_node, node.test)
-        g1 = myparents
+        _test_node = CFGNode(parents=myparents, ast=ast.parse('_if: %s' % astunparse.unparse(node.test).strip()).body[0])
+        ast.copy_location(_test_node.ast_node, node.test)
+        test_node = self.walk(node.test, [_test_node])
+        g1 = test_node
         for n in node.body:
             g1 = self.walk(n, g1)
         assert type(g1) is list
-        g2 = myparents
+        g2 = test_node
         for n in node.orelse:
             g2 = self.walk(n, g2)
         assert type(g2) is list
@@ -419,7 +420,7 @@ class PyCFG:
         node = self.parse(src)
         nodes = self.walk(node, [self.founder])
         self.last_node = CFGNode(parents=nodes, ast=ast.parse('stop').body[0])
-        ast.copy_location(self.last_node.ast_node, node.body[0])
+        ast.copy_location(self.last_node.ast_node, node.body[-1])
         self.update_children()
         self.link_functions()
 
@@ -444,7 +445,7 @@ def get_cfg(pythonfile):
         cs = set([c for c in children_at if c != at])
         g[at]['parents'] |= ps
         g[at]['children'] |= cs
-    return g
+    return (g, cfg.founder.ast_node.lineno, cfg.last_node.ast_node.lineno)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

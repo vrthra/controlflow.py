@@ -58,7 +58,8 @@ def branch_distance(parent, target, cfg, seen):
     if parent in branch_cov:
         # the parent was executed. Hence, if the target is executed
         # then there is no cost.
-        if target in branch_cov[parent]: return 0
+        if target in branch_cov[parent]:
+            return 0
 
         # the target was not executed. Hence the flow diverged here.
         return compute_predicate_cost(parent, target, cfg)
@@ -77,6 +78,39 @@ def branch_distance(parent, target, cfg, seen):
 
         return path_cost + node_cost
 
+def compute_dominator(dominator, cfg, start = 0, key='parents'):
+    dominator[start] = {start}
+    all_nodes = set(cfg.keys())
+    rem_nodes = all_nodes - {start}
+    for n in rem_nodes:
+        dominator[n] = all_nodes
+
+    c = True
+    while c:
+        c = False
+        for n in rem_nodes:
+            pred_n = cfg[n][key]
+            doms = [dominator[p] for p in pred_n]
+            i = set.intersection(*doms) if doms else set()
+            v = {n} | i
+            if dominator[n] != v:
+                c = True
+            dominator[n] = v
+
+def a_control_dependent_on_b(a, b, cfg, dom, postdom):
+    # A has at least 2 successors in CFG
+    if len(cfg[a].children) < 2: return False
+
+    # B dominates A
+    if a not in dom[b]: return False
+
+    # B is not post dominated by A
+    if b in postdom[a]: return False
+
+    # there exist a successor for B that is post dominated by A
+    successors = cfg[b].children
+    return any(s in postdom[a] for s in successors)
+
 if __name__ == '__main__':
     cov = coverage.Coverage(branch=True)
 
@@ -89,7 +123,21 @@ if __name__ == '__main__':
         branch_cov.setdefault(i, []).append(j)
         source_code[j] = (src, l)
 
-    cfg = dict(pycfg.get_cfg('example.py'))
+    cfg, founder, last_node = pycfg.get_cfg('example.py')
+    cfg = dict(cfg)
+    #print(v)
+    dom = {}
+    print('dominators')
+    compute_dominator(dom, cfg, start=founder, key='parents')
+    for k in dom:
+        print(k, dom[k])
+
+    pdom = {}
+    print('postdominators')
+    compute_dominator(pdom, cfg, start=last_node, key='children')
+    for k in pdom:
+        print(k, pdom[k])
+
     target = int(sys.argv[1])
     parents = cfg[target]['parents']
     bd = min(branch_distance(p, target, cfg, set()) for p in parents)
