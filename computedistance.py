@@ -9,7 +9,7 @@ import example
 import pycfg
 import math
 import ast
-import expr
+import dexpr
 
 global prevline
 prevline = 0
@@ -43,7 +43,7 @@ def compute_predicate_cost(parent, target, cfg):
     global branch_cov
     global source_code
     src, l = source_code[parent]
-    ei = expr.ExprInterpreter(l)
+    ei = dexpr.DistInterpreter(l)
     v = ei.eval(src)
     return v
 
@@ -80,26 +80,13 @@ def branch_distance(parent, target, cfg, seen):
 if __name__ == '__main__':
     cov = coverage.Coverage(branch=True)
 
-    #cdata = cov.get_data()
-    #cdata.read_file('example.coverage')
-    #cdata_arcs = cdata.arcs(cdata.measured_files()[0])
-
-    #cov.start()
-    #example.gcd(15,12)
-    #cov.stop()
-
     sys.settrace(traceit)
     example.gcd(15,12)
     sys.settrace(None)
 
-    # print(cdata_arcs)
-
     for i,j,src,l in cdata_arcs:
         branch_cov.setdefault(i, []).append(j)
         source_code[j] = (src, l)
-
-    #import pudb
-    #pudb.set_trace()
 
     cfg = dict(pycfg.get_cfg('example.py'))
     target = int(sys.argv[1])

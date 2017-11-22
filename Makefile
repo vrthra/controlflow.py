@@ -21,6 +21,18 @@ example:
 clean:
 	rm -rf .coverage
 
-I=1
+I=9
+I=5
 branch_distance:
 	python3 ./computedistance.py $(I)
+
+a=1
+b=2
+c=3
+d=4
+op=+
+interp:
+	python3 interp.py 'a $(op) b' '{"a":$(a), "b":$(b), "c":$(c), "d":$(d)}'
+
+dinterp:
+	python3 dexpr.py 'a $(op) b' '{"a":$(a), "b":$(b), "c":$(c), "d":$(d)}'
