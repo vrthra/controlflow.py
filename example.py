@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 def gcd(a, b):
+    pass
     if a < b:
         c = a
         a = b

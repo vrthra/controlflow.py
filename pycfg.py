@@ -256,6 +256,11 @@ class PyCFG:
 
         return [CFGNode(parents=myparents, ast=node)]
 
+    def on_pass(self, node, myparents):
+        assert type(myparents) is list
+        assert type(myparents[0]) is CFGNode
+        return [CFGNode(parents=myparents, ast=node)]
+
     def on_return(self, node, myparents):
         assert type(myparents) is list
         assert type(myparents[0]) is CFGNode

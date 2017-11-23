@@ -99,17 +99,16 @@ def compute_dominator(dominator, cfg, start = 0, key='parents'):
 
 def a_control_dependent_on_b(a, b, cfg, dom, postdom):
     # A has at least 2 successors in CFG
-    if len(cfg[a]['children']) < 2: return False
+    if len(cfg[b]['children']) < 2: return False
 
+    b_successors = cfg[b]['children']
     # B dominates A
-    if a not in dom[b]: return False
-
+    v1 = b in dom[a]
     # B is not post dominated by A
-    if b in postdom[a]: return False
-
+    v2 = a not in postdom[b]
     # there exist a successor for B that is post dominated by A
-    successors = cfg[b]['children']
-    return any(s in postdom[a] for s in successors)
+    v3 = any(a in postdom[s] for s in b_successors)
+    return v1 and v2 and v3
 
 def approach_level(path, cfg, dom, postdom):
     if not path: return 0
