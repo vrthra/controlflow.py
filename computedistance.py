@@ -70,13 +70,7 @@ def branch_distance(parent, target, cfg, seen):
         if not gparents: return math.inf
 
         # go up the minimum chain.
-        path_cost = min(branch_distance(gp, parent, cfg, seen) for gp in gparents)
-
-        is_conditional = len(cfg[target]['children']) > 1
-        # the cost of missing a conditional is 1 and that of a non-conditional is 0
-        node_cost = 1 if is_conditional else 0
-
-        return path_cost + node_cost
+        return min(branch_distance(gp, parent, cfg, seen) for gp in gparents)
 
 def compute_dominator(dominator, cfg, start = 0, key='parents'):
     dominator[start] = {start}

@@ -23,8 +23,9 @@ clean:
 
 I=9
 I=5
+approach=3 4 5 6
 branch_distance:
-	python3 ./computedistance.py $(I)
+	python3 ./computedistance.py $(I) $(approach)
 
 a=1
 b=2
