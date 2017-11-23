@@ -150,5 +150,5 @@ if __name__ == '__main__':
     print('branch distance(target:%d): %d' % (target, bd))
 
     path = [int(i) for i in sys.argv[2:]]
-    al = approach_level(path, cfg, dom, pdom)
+    al = approach_level(reversed(path), cfg, dom, pdom)
     print('approach level(%s): %d' % (path, al))
