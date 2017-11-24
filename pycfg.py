@@ -391,7 +391,7 @@ class PyCFG:
         args = node.args
         returns = node.returns
 
-        enter_node = CFGNode(parents=[], ast=ast.parse('enter: %s(%s)' % (node.name, [a.arg for a in node.args.args]) ).body[0]) # sentinel
+        enter_node = CFGNode(parents=[], ast=ast.parse('enter: %s(%s)' % (node.name, ', '.join([a.arg for a in node.args.args])) ).body[0]) # sentinel
         ast.copy_location(enter_node.ast_node, node)
         exit_node = CFGNode(parents=[], ast=ast.parse('exit: %s' %node.name).body[0]) # sentinel
 
