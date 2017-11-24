@@ -141,6 +141,7 @@ module Python
 """
 
 import ast
+import re
 import sys
 import operator
 import json
@@ -198,13 +199,17 @@ class CFGNode(dict):
 
     @classmethod
     def to_dot(cls):
+        def unhack(v):
+            for i in ['if', 'while', 'for']:
+                v = re.sub(r'^_%s:' % i, '%s:' % i, v)
+            return v
         G = pygraphviz.AGraph(directed=True)
         for k, v in CFGNode.cache.items():
             G.add_node(k)
             n = G.get_node(k)
             cnode = CFGNode.i(k)
             lineno = cnode.ast_node.lineno if hasattr(cnode.ast_node, 'lineno') else 0
-            n.attr['label'] = "%d: %s" % (lineno, astunparse.unparse(cnode.ast_node).strip())
+            n.attr['label'] = "%d: %s" % (lineno, unhack(astunparse.unparse(cnode.ast_node).strip()))
             if cnode.parents:
                 for i in cnode.parents:
                     G.add_edge(i, k)
@@ -298,7 +303,7 @@ class PyCFG:
 
     def on_for(self, node, myparents):
         #node.target in node.iter: node.body
-        _test_node = CFGNode(parent=myparents, ast=ast.parse('for: True if %s else False' % astunparse.unparse(node.iter).strip()).body[0])
+        _test_node = CFGNode(parent=myparents, ast=ast.parse('_for: True if %s else False' % astunparse.unparse(node.iter).strip()).body[0])
         ast.copy_location(_test_node.ast_node, node)
 
         # we attach the label node here so that break can find it.
