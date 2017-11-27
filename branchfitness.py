@@ -32,7 +32,7 @@ class Fitness:
         return min(self._branch_distance(p, self.target(), set()) for p in parents)
 
     def compute_predicate_cost(self, parent, target):
-        src, l = self.source_code[parent]
+        f,src, l = self.source_code[parent]
         ei = dexpr.DistInterpreter(l)
         v = ei.eval(src)
         return v

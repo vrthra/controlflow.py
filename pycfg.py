@@ -113,7 +113,7 @@ class PyCFG:
             fn = getattr(self, fname)
             assert type(myparents[0]) is CFGNode
             v = fn(node, myparents)
-            assert type(v[0]) is CFGNode
+            if v: assert type(v[0]) is CFGNode
             return v
         else:
             return myparents
@@ -145,11 +145,6 @@ class PyCFG:
         assert type(myparents[0]) is CFGNode
         return [CFGNode(parents=myparents, ast=node)]
 
-    def on_return(self, node, myparents):
-        assert type(myparents) is list
-        assert type(myparents[0]) is CFGNode
-        return [CFGNode(parents=myparents, ast=node)]
-
     def on_break(self, node, myparents):
         parent = myparents[0].parents[0]
         while not hasattr(CFGNode.i(parent), 'exit_nodes'):
@@ -157,7 +152,7 @@ class PyCFG:
             parent = CFGNode.i(parent).parents[0]
 
         assert hasattr(CFGNode.i(parent), 'exit_nodes')
-        p = CFGNode(parent=myparents, ast=node)
+        p = CFGNode(parents=myparents, ast=node)
 
         # make the break one of the parents of label node.
         CFGNode.i(parent).exit_nodes.append(p)
@@ -171,7 +166,7 @@ class PyCFG:
             # we have ordered parents
             parent = CFGNode.i(parent).parents[0]
         assert hasattr(CFGNode.i(parent), 'exit_nodes')
-        p = CFGNode(parent=myparents, ast=node)
+        p = CFGNode(parents=myparents, ast=node)
 
         # make continue one of the parents of the original test node.
         CFGNode.i(parent).add_parent(p)
@@ -182,7 +177,7 @@ class PyCFG:
 
     def on_for(self, node, myparents):
         #node.target in node.iter: node.body
-        _test_node = CFGNode(parent=myparents, ast=ast.parse('_for: True if %s else False' % astunparse.unparse(node.iter).strip()).body[0])
+        _test_node = CFGNode(parents=myparents, ast=ast.parse('_for: True if %s else False' % astunparse.unparse(node.iter).strip()).body[0])
         ast.copy_location(_test_node.ast_node, node)
 
         # we attach the label node here so that break can find it.
@@ -262,6 +257,24 @@ class PyCFG:
         p = [CFGNode(parents=myparents, ast=node)]
         return self.walk(node.value, p)
 
+    def on_return(self, node, myparents):
+        assert type(myparents) is list
+        assert type(myparents[0]) is CFGNode
+        parent = myparents[0].parents[0]
+        # on return look back to the function definition.
+        while not hasattr(CFGNode.i(parent), 'return_nodes'):
+            parent = CFGNode.i(parent).parents[0]
+        assert hasattr(CFGNode.i(parent), 'return_nodes')
+
+        p = CFGNode(parents=myparents, ast=node)
+
+        # make the break one of the parents of label node.
+        CFGNode.i(parent).return_nodes.append(p)
+
+        # return doesnt have immediate children
+        #return [CFGNode.i(parent)]
+        return []
+
     def on_functiondef(self, node, myparents):
         # a function definition does not actually continue the thread of
         # control flow
@@ -273,14 +286,21 @@ class PyCFG:
         enter_node = CFGNode(parents=[], ast=ast.parse('enter: %s(%s)' % (node.name, ', '.join([a.arg for a in node.args.args])) ).body[0]) # sentinel
         ast.copy_location(enter_node.ast_node, node)
         exit_node = CFGNode(parents=[], ast=ast.parse('exit: %s' %node.name).body[0]) # sentinel
+        enter_node.return_nodes = [] # sentinel
 
         p = [enter_node]
         for n in node.body:
             assert type(p[0]) is CFGNode
             p = self.walk(n, p)
-            assert type(p[0]) is CFGNode
-        exit_node.add_parents(p)
+            if p: assert type(p[0]) is CFGNode
+
         ast.copy_location(exit_node.ast_node, node.body[-1])
+
+        # we assume that the function has at least one return statement.
+        #if enter_node.return_nodes:
+        exit_node.add_parents(enter_node.return_nodes)
+        #else:
+        #    exit_node.add_parents(p)
 
         self.functions[fname] = [enter_node, exit_node]
 

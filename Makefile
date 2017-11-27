@@ -1,5 +1,5 @@
-dots:
-	@python3  pycfg.py example.py -d
+dots: coverage
+	python3  pycfg.py example.py -d -y ./example.bcoverage
 
 cfg:
 	python3  pycfg.py example.py -c
@@ -8,9 +8,12 @@ show:
 	nl -ba example.py
 
 coverage:
+	python3 ./branchcov.py ./example.py main > example.bcoverage
+
+oldcoverage:
 	python3 -mcoverage run --branch example.py
 	python3 -mcoverage report
-	mv .coverage example.coverage
+	mv .coverage example.bcoverage
 
 xml:
 	python3 -mcoverage xml
