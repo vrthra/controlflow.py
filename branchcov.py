@@ -33,7 +33,7 @@ def capture_coverage(fn):
     source_code = {}
 
     for f,i,j,ssrc,l in traceit.cdata_arcs:
-        branch_cov.setdefault(i, []).append(j)
+        branch_cov.setdefault(i, set()).add(j)
         source_code[j] = (f, ssrc, l)
 
     return (traceit.cdata_arcs, source_code, branch_cov)
