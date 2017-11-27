@@ -25,10 +25,10 @@ I=9
 I=5
 approach=3 4 5 6
 branch_distance:
-	python3 ./branchdistance.py $(I) $(approach)
+	python3 ./branchfitness.py $(I) $(approach)
 
 branch_distance2:
-	python3 ./branchdistance.py 32 33 34 35
+	python3 ./branchfitness.py 32 33 34 35
 
 a=1
 b=2
