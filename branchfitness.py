@@ -32,7 +32,8 @@ class Fitness:
         return min(self._branch_distance(p, self.target(), set()) for p in parents)
 
     def compute_predicate_cost(self, parent, target):
-        f,src, l = self.source_code[parent]
+        f,src,l = self.source_code[parent]
+        #print("parent[%d] src:%s l:%s" % (parent, src, str(l.keys())))
         ei = dexpr.DistInterpreter(l)
         v = ei.eval(src)
         return v
@@ -51,6 +52,7 @@ class Fitness:
                 return 0
 
             # the target was not executed. Hence the flow diverged here.
+            # print(parent, target)
             return self.compute_predicate_cost(parent, target)
 
         else: # The parent was not executed. So go up the chain

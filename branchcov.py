@@ -17,6 +17,8 @@ def traceit(frame, event, arg):
         myast = None
         if src.startswith('if ') and src.endswith(':'):
             ssrc = src[3:-1].strip()
+        elif src.startswith('elif ') and src.endswith(':'):
+            ssrc = src[4:-1].strip()
         elif src.startswith('while ') and src.endswith(':'):
             ssrc = src[5:-1].strip()
         traceit.cdata_arcs.append((source, traceit.prevline, line, ssrc, myglobals))
