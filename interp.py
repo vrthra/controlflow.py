@@ -64,6 +64,12 @@ class ExprInterpreter:
         assert len(node.body) == 1
         return self.walk(node.body[0])
 
+    def on_str(self, node):
+        """
+        Str(string s) -- a string as a pyobject
+        """
+        return node.s
+
     def on_num(self, node):
         """
         Num(object n) -- a number as a PyObject.

@@ -1,148 +1,88 @@
 #!/usr/bin/env python3
-#cov.set_option("run:branch", True)
 
-import coverage
-import inspect
 import sys
-import json
 import example
 import pycfg
 import math
-import ast
 import dexpr
+import branchcov
 
-global prevline
-prevline = 0
-global cdata_arcs
-cdata_arcs = []
-global branch_cov
-branch_cov = {}
-global source_code
-source_code = {}
+class Fitness:
+    def __init__(self, fn, path):
+        self.cdata_arcs, self.source_code, self.branch_cov = branchcov.capture_coverage(fn)
 
-def traceit(frame, event, arg):
-    global prevline
-    if event in ['call', 'return', 'line']: # 'exception'
-        line = frame.f_lineno
-        mylocals = frame.f_locals
-        f = inspect.getframeinfo(frame)
-        src = f.code_context[f.index].strip()
-        ssrc = None
-        myast = None
-        if src.startswith('if ') and src.endswith(':'):
-            ssrc = src[3:-1].strip()
-        elif src.startswith('while ') and src.endswith(':'):
-            ssrc = src[5:-1].strip()
-        cdata_arcs.append((prevline, line, ssrc, mylocals))
-        prevline = line
-    else: pass
-    return traceit
+        cfg, founder, last_node = pycfg.get_cfg('example.py')
+        self.cfg = dict(cfg)
+        self.dom = pycfg.compute_dominator(self.cfg, start=founder, key='parents')
+        self.postdom = pycfg.compute_dominator(self.cfg, start=last_node, key='children')
 
+        self.path = path
 
-def compute_predicate_cost(parent, target, cfg):
-    global branch_cov
-    global source_code
-    src, l = source_code[parent]
-    ei = dexpr.DistInterpreter(l)
-    v = ei.eval(src)
-    return v
+    def print_dom(dom):
+        for k in dom: print(k, dom[k])
 
-def branch_distance(parent, target, cfg, seen):
-    global branch_cov
-    seen.add(target)
-    parent_dict = cfg[parent]
+    def approach_level(self):
+        return self._approach_level(reversed(self.path))
 
-    gparents = [p for p in parent_dict['parents'] if p not in seen]
+    def target(self):
+        return self.path[-1]
 
-    # was the parent executed?
-    if parent in branch_cov:
-        # the parent was executed. Hence, if the target is executed
-        # then there is no cost.
-        if target in branch_cov[parent]:
-            return 0
+    def branch_distance(self):
+        parents = self.cfg[self.target()]['parents']
+        return min(self._branch_distance(p, self.target(), set()) for p in parents)
 
-        # the target was not executed. Hence the flow diverged here.
-        return compute_predicate_cost(parent, target, cfg)
+    def compute_predicate_cost(self, parent, target):
+        src, l = self.source_code[parent]
+        ei = dexpr.DistInterpreter(l)
+        v = ei.eval(src)
+        return v
 
-    else: # The parent was not executed. So go up the chain
+    def _branch_distance(self, parent, target, seen):
+        seen.add(target)
+        parent_dict = self.cfg[parent]
 
-        # if we can not go further up, we dont know how close we came
-        if not gparents: return math.inf
+        gparents = [p for p in parent_dict['parents'] if p not in seen]
 
-        # go up the minimum chain.
-        return min(branch_distance(gp, parent, cfg, seen) for gp in gparents)
+        # was the parent executed?
+        if parent in self.branch_cov:
+            # the parent was executed. Hence, if the target is executed
+            # then there is no cost.
+            if target in self.branch_cov[parent]:
+                return 0
 
-def compute_dominator(dominator, cfg, start = 0, key='parents'):
-    dominator[start] = {start}
-    all_nodes = set(cfg.keys())
-    rem_nodes = all_nodes - {start}
-    for n in rem_nodes:
-        dominator[n] = all_nodes
+            # the target was not executed. Hence the flow diverged here.
+            return self.compute_predicate_cost(parent, target)
 
-    c = True
-    while c:
-        c = False
-        for n in rem_nodes:
-            pred_n = cfg[n][key]
-            doms = [dominator[p] for p in pred_n]
-            i = set.intersection(*doms) if doms else set()
-            v = {n} | i
-            if dominator[n] != v:
-                c = True
-            dominator[n] = v
+        else: # The parent was not executed. So go up the chain
 
-def a_control_dependent_on_b(a, b, cfg, dom, postdom):
-    # A has at least 2 successors in CFG
-    if len(cfg[b]['children']) < 2: return False
+            # if we can not go further up, we dont know how close we came
+            if not gparents: return math.inf
 
-    b_successors = cfg[b]['children']
-    # B dominates A
-    v1 = b in dom[a]
-    # B is not post dominated by A
-    v2 = a not in postdom[b]
-    # there exist a successor for B that is post dominated by A
-    v3 = any(a in postdom[s] for s in b_successors)
-    return v1 and v2 and v3
+            # go up the minimum chain.
+            return min(self._branch_distance(gp, parent, seen) for gp in gparents)
 
-def approach_level(path, cfg, dom, postdom):
-    if not path: return 0
-    hd, *tl = path
-    if not tl: return 0
-    cost = 1 if a_control_dependent_on_b(hd, tl[0], cfg, dom, postdom) else 0
-    return cost + approach_level(tl, cfg, dom, postdom)
+    def a_control_dependent_on_b(self, a, b):
+        # A has at least 2 successors in CFG
+        if len(self.cfg[b]['children']) < 2: return False
+
+        b_successors = self.cfg[b]['children']
+        # B dominates A
+        v1 = b in self.dom[a]
+        # B is not post dominated by A
+        v2 = a not in self.postdom[b]
+        # there exist a successor for B that is post dominated by A
+        v3 = any(a in self.postdom[s] for s in b_successors)
+        return v1 and v2 and v3
+
+    def _approach_level(self, path):
+        if not path: return 0
+        hd, *tl = path
+        if not tl: return 0
+        cost = 1 if self.a_control_dependent_on_b(hd, tl[0]) else 0
+        return cost + self._approach_level(tl)
 
 if __name__ == '__main__':
-    cov = coverage.Coverage(branch=True)
-
-    trace = sys.gettrace()
-    sys.settrace(traceit)
-    example.gcd(15,12)
-    sys.settrace(trace)
-
-    for i,j,src,l in cdata_arcs:
-        branch_cov.setdefault(i, []).append(j)
-        source_code[j] = (src, l)
-
-    cfg, founder, last_node = pycfg.get_cfg('example.py')
-    cfg = dict(cfg)
-    #print(v)
-    dom = {}
-    print('dominators')
-    compute_dominator(dom, cfg, start=founder, key='parents')
-    for k in dom:
-        print(k, dom[k])
-
-    pdom = {}
-    print('postdominators')
-    compute_dominator(pdom, cfg, start=last_node, key='children')
-    for k in pdom:
-        print(k, pdom[k])
-
-    target = int(sys.argv[1])
-    parents = cfg[target]['parents']
-    bd = min(branch_distance(p, target, cfg, set()) for p in parents)
-    print('branch distance(target:%d): %d' % (target, bd))
-
-    path = [int(i) for i in sys.argv[2:]]
-    al = approach_level(reversed(path), cfg, dom, pdom)
-    print('approach level(%s): %d' % (path, al))
+    path = [int(i) for i in sys.argv[1:]]
+    f = Fitness(example.main, path)
+    print('Approach Level %d' % f.approach_level())
+    print('Branch distance(target:%d): %d' % (f.target(), f.branch_distance()))

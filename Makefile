@@ -19,13 +19,16 @@ example:
 	cat example.py | nl -b a
 
 clean:
-	rm -rf .coverage
+	rm -rf .coverage __pycache__/
 
 I=9
 I=5
 approach=3 4 5 6
 branch_distance:
 	python3 ./computedistance.py $(I) $(approach)
+
+branch_distance2:
+	python3 ./computedistance.py 32 33 34 35
 
 a=1
 b=2
