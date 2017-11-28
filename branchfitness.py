@@ -7,18 +7,21 @@ import branchcov
 from importlib.machinery import SourceFileLoader
 
 class Fitness:
-    def __init__(self, filename, method, path):
-        my_module = SourceFileLoader('', filename).load_module()
-        fn = getattr(my_module, method)
+    def __init__(self, filename):
+        self.init_cfg(filename)
 
-        self.cdata_arcs, self.source_code, self.branch_cov = branchcov.capture_coverage(fn)
-
+    def init_cfg(self, filename):
+        self.my_module = SourceFileLoader('', filename).load_module()
         cfg, founder, last_node = pycfg.get_cfg(filename)
         self.cfg = dict(cfg)
         self.dom = pycfg.compute_dominator(self.cfg, start=founder, key='parents')
         self.postdom = pycfg.compute_dominator(self.cfg, start=last_node, key='children')
 
+    def compute_fitness(self, fn, path):
+        def normalized(x): return x / (x + 1.0)
+        self.cdata_arcs, self.source_code, self.branch_cov = branchcov.capture_coverage(fn)
         self.path = path
+        return (self.approach_level() + normalized(self.branch_distance()))
 
     def print_dom(dom):
         for k in dom: print(k, dom[k])
@@ -88,6 +91,9 @@ if __name__ == '__main__':
     import sys
     import example
     path = [int(i) for i in sys.argv[3:]]
-    ffn = Fitness(sys.argv[1], sys.argv[2], path)
+    ffn = Fitness(sys.argv[1])
+    fn = getattr(ffn.my_module, sys.argv[2])
+    fitness = ffn.compute_fitness(fn, path)
     print('Approach Level %d' % ffn.approach_level())
     print('Branch distance(target:%d): %d' % (ffn.target(), ffn.branch_distance()))
+    print('Fitness: %f' % fitness)

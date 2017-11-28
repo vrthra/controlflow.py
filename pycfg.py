@@ -7,14 +7,9 @@ Use http://viz-js.com/ to view digraph output
 """
 
 import ast
-import coverage
 import re
-import sys
-import operator
-import json
 import astunparse
 import pygraphviz
-import argparse
 
 class CFGNode(dict):
     registry = 0
@@ -378,6 +373,8 @@ def get_cfg(pythonfile):
     return (g, cfg.founder.ast_node.lineno, cfg.last_node.ast_node.lineno)
 
 if __name__ == '__main__':
+    import json
+    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('pythonfile', help='The python file to be analyzed')
     parser.add_argument('-d','--dots', action='store_true', help='generate a dot file')
