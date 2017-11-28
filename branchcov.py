@@ -1,29 +1,28 @@
 import sys
-import json
 import inspect
+import re
+
+# these control flow contstructs have conditionals we can evaluate
+Control_Flow = ['if', 'elif', 'while', 'for']
+Control_Flow_Re = [re.compile(r'^ *%s +(.+) *: *' % i) for i in Control_Flow]
+# else, continue, break, and pass do not have conditionals
+# that can be evaluated.
 
 def traceit(frame, event, arg):
     traceit.prevline = vars(traceit).setdefault('prevline', 0)
-    traceit.cdata_arcs = vars(traceit).setdefault('cdata_arcs', [])
-    if event in ['call', 'return', 'line']: # 'exception'
-        line = frame.f_lineno
-        source = frame.f_code.co_filename
-        myglobals = dict(frame.f_globals) # should we do deep?
-        mylocals = frame.f_locals
-        myglobals.update(mylocals)
-        f = inspect.getframeinfo(frame)
-        src = f.code_context[f.index].strip()
-        ssrc = None
-        myast = None
-        if src.startswith('if ') and src.endswith(':'):
-            ssrc = src[3:-1].strip()
-        elif src.startswith('elif ') and src.endswith(':'):
-            ssrc = src[4:-1].strip()
-        elif src.startswith('while ') and src.endswith(':'):
-            ssrc = src[5:-1].strip()
-        traceit.cdata_arcs.append((source, traceit.prevline, line, ssrc, myglobals))
+    traceit.cov_arcs = vars(traceit).setdefault('cov_arcs', [])
+
+    if event in ['call', 'return', 'line']:
+        fname, line = frame.f_code.co_filename, frame.f_lineno
+        myvars = {**frame.f_globals, **frame.f_locals} # should we do deep copy?
+        finfo = inspect.getframeinfo(frame)
+        src = finfo.code_context[finfo.index]
+        matches = (ctrl.match(src) for ctrl in Control_Flow_Re)
+        conditional = next((m.group(1) for m in matches if m), None)
+
+        traceit.cov_arcs.append((fname, traceit.prevline, line, conditional, myvars))
         traceit.prevline = line
-    else: pass
+    else: pass # 'exception'
     return traceit
 
 def capture_coverage(fn):
@@ -34,20 +33,17 @@ def capture_coverage(fn):
     branch_cov = {}
     source_code = {}
 
-    for f,i,j,ssrc,l in traceit.cdata_arcs:
+    for f,i,j,conditional,l in traceit.cov_arcs:
         branch_cov.setdefault(i, set()).add(j)
-        source_code[j] = (f, ssrc, l)
+        source_code[j] = (f, conditional, l)
 
-    return (traceit.cdata_arcs, source_code, branch_cov)
+    return (traceit.cov_arcs, source_code, branch_cov)
 
 if __name__ == '__main__':
+    import json
     from importlib.machinery import SourceFileLoader
     v = SourceFileLoader('', sys.argv[1]).load_module()
-    method = 'main'
-    if len(sys.argv) > 2:
-        method = sys.argv[2]
+    method = sys.argv[2] if len(sys.argv) > 2 else 'main'
     arcs, source, bcov = capture_coverage(getattr(v, method))
-    cov = []
-    for f,i,j,src,l in arcs:
-        cov.append((i,j))
+    cov = [ (i,j) for f,i,j,src,l in arcs]
     print(json.dumps(cov))
