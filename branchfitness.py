@@ -35,7 +35,6 @@ class Fitness:
 
     def compute_predicate_cost(self, parent, target):
         f,src,l = self.source_code[parent]
-        #print("parent[%d] src:%s l:%s" % (parent, src, str(l.keys())))
         ei = dexpr.DistInterpreter(l)
         v = ei.eval(src)
         return v
@@ -89,6 +88,6 @@ if __name__ == '__main__':
     import sys
     import example
     path = [int(i) for i in sys.argv[3:]]
-    f = Fitness(sys.argv[1], sys.argv[2], path)
-    print('Approach Level %d' % f.approach_level())
-    print('Branch distance(target:%d): %d' % (f.target(), f.branch_distance()))
+    ffn = Fitness(sys.argv[1], sys.argv[2], path)
+    print('Approach Level %d' % ffn.approach_level())
+    print('Branch distance(target:%d): %d' % (ffn.target(), ffn.branch_distance()))
