@@ -16,9 +16,7 @@ class CFGNode(dict):
     cache = {}
     stack = []
     def __init__(self, parents=[], ast=None):
-        if parents:
-            assert type(parents[0]) is CFGNode
-        self.parents = [parent.rid for parent in parents]
+        self.parents = parents
         self.calls = []
         self.children = []
         self.ast_node = ast
@@ -26,67 +24,64 @@ class CFGNode(dict):
         CFGNode.cache[self.rid] = self
         CFGNode.registry += 1
 
-    @classmethod
-    def i(cls, i):
-        return cls.cache[i]
-
-    @classmethod
-    def l(cls, i):
-        n = cls.i(i)
-        return n.ast_node.lineno if hasattr(n.ast_node, 'lineno') else 0
+    def lineno(self):
+        return self.ast_node.lineno if hasattr(self.ast_node, 'lineno') else 0
 
     def __str__(self):
-        lineno = self.ast_node.lineno if hasattr(self.ast_node, 'lineno') else 0
-        return "id:%d parents: %s src[%d]: %s" % (self.rid, str(self.parents), lineno, astunparse.unparse(self.ast_node).strip())
+        return "id:%d parents: %s src[%d]: %s" % (self.rid, str([p.rid for p in self.parents]), self.lineno(), self.source())
 
     def __repr__(self):
         return str(self)
 
     def add_child(self, c):
-        assert type(c) is int
         if c not in self.children:
             self.children.append(c)
 
+    def __eq__(self, other):
+        return self.rid == other.rid
+
+    def __neq__(self, other):
+        return self.rid != other.rid
+
+
     def add_parent(self, p):
-        assert type(p) is CFGNode
         if p not in self.parents:
-            self.parents.append(p.rid)
+            self.parents.append(p)
 
     def add_parents(self, ps):
-        assert type(ps) is list
         for p in ps:
             self.add_parent(p)
 
     def add_calls(self, func):
         self.calls.append(func)
 
+    def source(self):
+        return astunparse.unparse(self.ast_node).strip()
+
     def to_json(self):
-        lineno = self.ast_node.lineno if hasattr(self.ast_node, 'lineno') else 0
-        return {'id':self.rid, 'parents': self.parents, 'children': self.children, 'calls': self.calls, 'at':lineno ,'ast':astunparse.unparse(self.ast_node).strip()}
+        return {'id':self.rid, 'parents': [p.rid for p in self.parents], 'children': [c.rid for c in self.children], 'calls': self.calls, 'at':self.lineno() ,'ast':self.source()}
 
     @classmethod
     def to_dot(cls, arcs=None):
         def unhack(v):
-            for i in ['if', 'while', 'for']:
+            for i in ['if', 'while', 'for', 'elif']:
                 v = re.sub(r'^_%s:' % i, '%s:' % i, v)
             return v
         G = pygraphviz.AGraph(directed=True)
         cov_lines = [i for i,j in arcs]
-        for k, v in CFGNode.cache.items():
-            G.add_node(k)
-            n = G.get_node(k)
-            cnode = CFGNode.i(k)
-            lineno = CFGNode.l(k)
-            n.attr['label'] = "%d: %s" % (lineno, unhack(astunparse.unparse(cnode.ast_node).strip()))
-            if cnode.parents:
-                for i in cnode.parents:
-                    plineno = CFGNode.l(i)
-                    if  (plineno, lineno) in arcs:
-                        G.add_edge(i, k, color='blue')
-                    elif plineno == lineno and lineno in cov_lines:
-                        G.add_edge(i, k, color='blue')
-                    else:
-                        G.add_edge(i, k, color='red')
+        for nid, cnode in CFGNode.cache.items():
+            G.add_node(cnode.rid)
+            n = G.get_node(cnode.rid)
+            lineno = cnode.lineno()
+            n.attr['label'] = "%d: %s" % (lineno, unhack(cnode.source()))
+            for pn in cnode.parents:
+                plineno = pn.lineno()
+                if  (plineno, lineno) in arcs:
+                    G.add_edge(pn.rid, cnode.rid, color='blue')
+                elif plineno == lineno and lineno in cov_lines:
+                    G.add_edge(pn.rid, cnode.rid, color='blue')
+                else:
+                    G.add_edge(pn.rid, cnode.rid, color='red')
         return G.string()
 
 class PyCFG:
@@ -102,14 +97,11 @@ class PyCFG:
         return ast.parse(src)
 
     def walk(self, node, myparents):
-        assert type(myparents[0]) is CFGNode
         if node is None: return
         fname = "on_%s" % node.__class__.__name__.lower()
         if hasattr(self, fname):
             fn = getattr(self, fname)
-            assert type(myparents[0]) is CFGNode
             v = fn(node, myparents)
-            if v: assert type(v[0]) is CFGNode
             return v
         else:
             return myparents
@@ -137,35 +129,33 @@ class PyCFG:
         return [CFGNode(parents=myparents, ast=node)]
 
     def on_pass(self, node, myparents):
-        assert type(myparents) is list
-        assert type(myparents[0]) is CFGNode
         return [CFGNode(parents=myparents, ast=node)]
 
     def on_break(self, node, myparents):
         parent = myparents[0].parents[0]
-        while not hasattr(CFGNode.i(parent), 'exit_nodes'):
+        while not hasattr(parent, 'exit_nodes'):
             # we have ordered parents
             parent = CFGNode.i(parent).parents[0]
 
-        assert hasattr(CFGNode.i(parent), 'exit_nodes')
+        assert hasattr(parent, 'exit_nodes')
         p = CFGNode(parents=myparents, ast=node)
 
         # make the break one of the parents of label node.
-        CFGNode.i(parent).exit_nodes.append(p)
+        parent.exit_nodes.append(p)
 
         # break doesnt have immediate children
         return []
 
     def on_continue(self, node, myparents):
         parent = myparents[0].parents[0]
-        while not hasattr(CFGNode.i(parent), 'exit_nodes'):
+        while not hasattr(parent, 'exit_nodes'):
             # we have ordered parents
-            parent = CFGNode.i(parent).parents[0]
-        assert hasattr(CFGNode.i(parent), 'exit_nodes')
+            parent = parent.parents[0]
+        assert hasattr(parent, 'exit_nodes')
         p = CFGNode(parents=myparents, ast=node)
 
         # make continue one of the parents of the original test node.
-        CFGNode.i(parent).add_parent(p)
+        parent.add_parent(p)
 
         # return the parent because a continue is not the parent
         # for the just next node
@@ -221,11 +211,9 @@ class PyCFG:
         g1 = test_node
         for n in node.body:
             g1 = self.walk(n, g1)
-        assert type(g1) is list
         g2 = test_node
         for n in node.orelse:
             g2 = self.walk(n, g2)
-        assert type(g2) is list
 
         return g1 + g2
 
@@ -254,21 +242,18 @@ class PyCFG:
         return self.walk(node.value, p)
 
     def on_return(self, node, myparents):
-        assert type(myparents) is list
-        assert type(myparents[0]) is CFGNode
         parent = myparents[0].parents[0]
         # on return look back to the function definition.
-        while not hasattr(CFGNode.i(parent), 'return_nodes'):
-            parent = CFGNode.i(parent).parents[0]
-        assert hasattr(CFGNode.i(parent), 'return_nodes')
+        while not hasattr(parent, 'return_nodes'):
+            parent = parent.parents[0]
+        assert hasattr(parent, 'return_nodes')
 
         p = CFGNode(parents=myparents, ast=node)
 
         # make the break one of the parents of label node.
-        CFGNode.i(parent).return_nodes.append(p)
+        parent.return_nodes.append(p)
 
         # return doesnt have immediate children
-        #return [CFGNode.i(parent)]
         return []
 
     def on_functiondef(self, node, myparents):
@@ -286,9 +271,7 @@ class PyCFG:
 
         p = [enter_node]
         for n in node.body:
-            assert type(p[0]) is CFGNode
             p = self.walk(n, p)
-            if p: assert type(p[0]) is CFGNode
 
         ast.copy_location(exit_node.ast_node, node.body[-1])
 
@@ -303,18 +286,18 @@ class PyCFG:
         return myparents
 
     def link_functions(self):
-        for k,v in CFGNode.cache.items():
-            if v.calls:
-                for calls in v.calls:
+        for nid,node in CFGNode.cache.items():
+            if node.calls:
+                for calls in node.calls:
                     if calls in self.functions:
                         enter, exit = self.functions[calls]
-                        enter.add_parent(v)
-                        v.add_parent(exit)
+                        enter.add_parent(node)
+                        node.add_parent(exit)
 
     def update_children(self):
-        for k,v in CFGNode.cache.items():
-            for p in v.parents:
-                CFGNode.cache[p].add_child(k)
+        for nid,node in CFGNode.cache.items():
+            for p in node.parents:
+                p.add_child(node)
 
     def gen_cfg(self, src):
         """
