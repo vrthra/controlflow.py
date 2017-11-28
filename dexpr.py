@@ -33,41 +33,36 @@ class DistInterpreter(interp.ExprInterpreter):
     The branch distance evaluator
     """
     def __init__(self, symtable):
-        self.OpMap = {
-          ast.Is: lambda a, b: a is b,
-          ast.IsNot: lambda a, b: a is not b,
-          ast.In: lambda a, b: a in b,
-          ast.NotIn: lambda a, b: a not in b,
-          ast.Add: lambda a, b: a + b,
-          ast.BitAnd: lambda a, b: a & b,
-          ast.BitOr: lambda a, b: a | b,
-          ast.BitXor: lambda a, b: a ^ b,
-          ast.Div: lambda a, b: a / b,
-          ast.FloorDiv: lambda a, b: a // b,
-          ast.LShift:  lambda a, b: a << b,
-          ast.RShift: lambda a, b: a >> b,
-          ast.Mult:  lambda a, b: a * b,
-          ast.Pow: lambda a, b: a ** b,
-          ast.Sub: lambda a, b: a - b,
-          ast.Mod: lambda a, b: a % b,
+        interp.ExprInterpreter.__init__(self, symtable)
+        self.unaryop = {
+          ast.Invert: lambda a: ~a,
+          ast.Not: lambda a: a,
+          ast.UAdd: lambda a: +a,
+          ast.USub: lambda a: -a
+        }
 
-          ast.And: lambda a, b: a + b,
-          ast.Or: lambda a, b: min(a, b),
+        # cmpop = Eq | NotEq | Lt | LtE | Gt | GtE | Is | IsNot | In | NotIn
+        self.cmpop = {
 
           ast.Eq: lambda a, b: 0 if a == b else delta(a, b),
           ast.NotEq: lambda a, b: 0 if a != b else delta(a, b),
 
-          ast.Gt: lambda a, b: 0 if a > b else delta(a, b),
-          ast.GtE: lambda a, b: 0 if a >= b else delta(a, b),
           ast.Lt: lambda a, b: 0 if a < b else delta(a, b),
           ast.LtE: lambda a, b: 0 if a <= b else delta(a, b),
+          ast.Gt: lambda a, b: 0 if a > b else delta(a, b),
+          ast.GtE: lambda a, b: 0 if a >= b else delta(a, b),
 
-          ast.Invert: lambda a: ~a,
+          ast.Is: lambda a, b: a is b,
+          ast.IsNot: lambda a, b: a is not b,
+          ast.In: lambda a, b: a in b,
+          ast.NotIn: lambda a, b: a not in b
+        }
 
-          ast.Not: lambda a: a,
-
-          ast.UAdd: lambda a: +a,
-          ast.USub: lambda a: -a}
+        # boolop = And | Or
+        self.boolop = {
+          ast.And: lambda a, b: a + b,
+          ast.Or: lambda a, b: min(a, b)
+        }
         self.symtable = symtable
 
     def on_nameconstant(self, node):

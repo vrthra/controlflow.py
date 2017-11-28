@@ -13,40 +13,51 @@ class ExprInterpreter:
     3
     """
     def __init__(self, symtable):
-        self.OpMap = {
+        # unaryop = Invert | Not | UAdd | USub
+        self.unaryop = {
+          ast.Invert: lambda a: ~a,
+          ast.Not: lambda a: a,
+          ast.UAdd: lambda a: +a,
+          ast.USub: lambda a: -a
+        }
+
+        # operator = Add | Sub | Mult | MatMult | Div | Mod | Pow | LShift | RShift | BitOr | BitXor | BitAnd | FloorDiv
+        self.binop = {
+          ast.Add: lambda a, b: a + b,
+          ast.Sub: lambda a, b: a - b,
+          ast.Mult:  lambda a, b: a * b,
+          ast.MatMult:  lambda a, b: a @ b,
+          ast.Div: lambda a, b: a / b,
+          ast.Mod: lambda a, b: a % b,
+          ast.Pow: lambda a, b: a ** b,
+          ast.LShift:  lambda a, b: a << b,
+          ast.RShift: lambda a, b: a >> b,
+          ast.BitOr: lambda a, b: a | b,
+          ast.BitXor: lambda a, b: a ^ b,
+          ast.BitAnd: lambda a, b: a & b,
+          ast.FloorDiv: lambda a, b: a // b
+        }
+
+        # cmpop = Eq | NotEq | Lt | LtE | Gt | GtE | Is | IsNot | In | NotIn
+        self.cmpop = {
+          ast.Eq: lambda a, b: a == b,
+          ast.NotEq: lambda a, b: a != b,
+          ast.Lt: lambda a, b: a < b,
+          ast.LtE: lambda a, b: a <= b,
+          ast.Gt: lambda a, b: a > b,
+          ast.GtE: lambda a, b: a >= b,
           ast.Is: lambda a, b: a is b,
           ast.IsNot: lambda a, b: a is not b,
           ast.In: lambda a, b: a in b,
-          ast.NotIn: lambda a, b: a not in b,
-          ast.Add: lambda a, b: a + b,
-          ast.BitAnd: lambda a, b: a & b,
-          ast.BitOr: lambda a, b: a | b,
-          ast.BitXor: lambda a, b: a ^ b,
-          ast.Div: lambda a, b: a / b,
-          ast.FloorDiv: lambda a, b: a // b,
-          ast.LShift:  lambda a, b: a << b,
-          ast.RShift: lambda a, b: a >> b,
-          ast.Mult:  lambda a, b: a * b,
-          ast.Pow: lambda a, b: a ** b,
-          ast.Sub: lambda a, b: a - b,
-          ast.Mod: lambda a, b: a % b,
+          ast.NotIn: lambda a, b: a not in b
+        }
 
+        # boolop = And | Or
+        self.boolop = {
           ast.And: lambda a, b: a and b,
-          ast.Or: lambda a, b: a or b,
+          ast.Or: lambda a, b: a or b
+        }
 
-          ast.Eq: lambda a, b: a == b,
-          ast.Gt: lambda a, b: a > b,
-          ast.GtE: lambda a, b: a >= b,
-          ast.Lt: lambda a, b: a < b,
-          ast.LtE: lambda a, b: a <= b,
-          ast.NotEq: lambda a, b: a != b,
-
-          ast.Invert: lambda a: ~a,
-
-          ast.Not: lambda a: a,
-
-          ast.UAdd: lambda a: +a,
-          ast.USub: lambda a: -a}
         self.symtable = symtable
 
     def walk(self, node):
@@ -108,7 +119,7 @@ class ExprInterpreter:
         hd = self.walk(node.left)
         op = node.ops[0]
         tl = self.walk(node.comparators[0])
-        return self.OpMap[type(op)](hd, tl)
+        return self.cmpop[type(op)](hd, tl)
 
     def on_unaryop(self, node):
         """
@@ -117,7 +128,7 @@ class ExprInterpreter:
         >>> expr.eval('-a')
         -1
         """
-        return self.OpMap[type(node.op)](self.walk(node.operand))
+        return self.unaryop[type(node.op)](self.walk(node.operand))
 
     def on_boolop(self, node):
         """
@@ -126,7 +137,7 @@ class ExprInterpreter:
         >>> expr.eval('a and b')
         2
         """
-        return reduce(self.OpMap[type(node.op)], [self.walk(n) for n in node.values])
+        return reduce(self.boolop[type(node.op)], [self.walk(n) for n in node.values])
 
 
     def on_binop(self, node):
@@ -136,7 +147,7 @@ class ExprInterpreter:
         >>> expr.eval('a + b')
         3
         """
-        return self.OpMap[type(node.op)](self.walk(node.left), self.walk(node.right))
+        return self.binop[type(node.op)](self.walk(node.left), self.walk(node.right))
 
     def on_call(self, node):
         func = self.walk(node.func)
