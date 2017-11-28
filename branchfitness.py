@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 
-import sys
-import example
 import pycfg
 import math
 import dexpr
 import branchcov
+from importlib.machinery import SourceFileLoader
 
 class Fitness:
-    def __init__(self, fn, path):
+    def __init__(self, filename, method, path):
+        my_module = SourceFileLoader('', filename).load_module()
+        fn = getattr(my_module, method)
+
         self.cdata_arcs, self.source_code, self.branch_cov = branchcov.capture_coverage(fn)
 
-        cfg, founder, last_node = pycfg.get_cfg('example.py')
+        cfg, founder, last_node = pycfg.get_cfg(filename)
         self.cfg = dict(cfg)
         self.dom = pycfg.compute_dominator(self.cfg, start=founder, key='parents')
         self.postdom = pycfg.compute_dominator(self.cfg, start=last_node, key='children')
@@ -84,7 +86,9 @@ class Fitness:
         return cost + self._approach_level(tl)
 
 if __name__ == '__main__':
-    path = [int(i) for i in sys.argv[1:]]
-    f = Fitness(example.main, path)
+    import sys
+    import example
+    path = [int(i) for i in sys.argv[3:]]
+    f = Fitness(sys.argv[1], sys.argv[2], path)
     print('Approach Level %d' % f.approach_level())
     print('Branch distance(target:%d): %d' % (f.target(), f.branch_distance()))

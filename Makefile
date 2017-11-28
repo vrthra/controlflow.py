@@ -26,12 +26,15 @@ clean:
 
 I=9
 I=5
-approach=3 4 5 6
-branch_distance:
-	python3 ./branchfitness.py $(I) $(approach)
+branch_distance_old: approach=3 4 5 6
+branch_distance_old:
+	python3 ./branchfitness.py example.py main $(I) $(approach)
 
-branch_distance2:
-	python3 ./branchfitness.py 32 33 34 35
+branch_distance: approach=32 33 34 35
+branch_distance: file=example.py
+branch_distance: method=main
+branch_distance:
+	python3 ./branchfitness.py $(file) $(method) $(approach)
 
 a=1
 b=2
