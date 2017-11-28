@@ -82,6 +82,7 @@ class CFGNode(dict):
                     G.add_edge(pn.rid, cnode.rid, color='blue')
                 else:
                     G.add_edge(pn.rid, cnode.rid, color='red')
+        G.draw('out.png', prog='dot')
         return G.string()
 
 class PyCFG:
