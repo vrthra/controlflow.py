@@ -88,6 +88,7 @@ class CFGNode(dict):
                     else:
                         G.add_edge(i, k, color='red')
         return G.string()
+
 class PyCFG:
     """
     The python CFG
@@ -153,7 +154,7 @@ class PyCFG:
         CFGNode.i(parent).exit_nodes.append(p)
 
         # break doesnt have immediate children
-        return [myparent]
+        return []
 
     def on_continue(self, node, myparents):
         parent = myparents[0].parents[0]
@@ -168,7 +169,7 @@ class PyCFG:
 
         # return the parent because a continue is not the parent
         # for the just next node
-        return [myparent]
+        return []
 
     def on_for(self, node, myparents):
         #node.target in node.iter: node.body
