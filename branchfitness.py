@@ -17,9 +17,11 @@ class Fitness:
         self.dom = pycfg.compute_dominator(self.cfg, start=founder, key='parents')
         self.postdom = pycfg.compute_dominator(self.cfg, start=last_node, key='children')
 
-    def compute_fitness(self, fn, path):
-        def normalized(x): return x / (x + 1.0)
+    def capture_coverage(self, fn):
         self.cdata_arcs, self.source_code, self.branch_cov = branchcov.capture_coverage(fn)
+
+    def compute_fitness(self, path):
+        def normalized(x): return x / (x + 1.0)
         self.path = path
         return (self.approach_level() + normalized(self.branch_distance()))
 
@@ -93,7 +95,8 @@ if __name__ == '__main__':
     path = [int(i) for i in sys.argv[3:]]
     ffn = Fitness(sys.argv[1])
     fn = getattr(ffn.my_module, sys.argv[2])
-    fitness = ffn.compute_fitness(fn, path)
+    ffn.capture_coverage(fn)
+    fitness = ffn.compute_fitness(path)
     print('Approach Level %d' % ffn.approach_level())
     print('Branch distance(target:%d): %d' % (ffn.target(), ffn.branch_distance()))
     print('Fitness: %f' % fitness)
