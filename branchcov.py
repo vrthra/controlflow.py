@@ -47,4 +47,4 @@ if __name__ == '__main__':
     arg = sys.argv[3] if len(sys.argv) > 3 else '%20abc'
     arcs, source, bcov = capture_coverage(lambda: getattr(v, method)(arg))
     cov = [ (i,j) for f,i,j,src,l in arcs]
-    print(json.dumps(cov))
+    print(json.dumps(cov), file=sys.stderr)

@@ -3,6 +3,7 @@ import string
 import ast
 import sys
 import json
+import builtins
 from functools import reduce
 
 class ExprInterpreter:
@@ -58,7 +59,9 @@ class ExprInterpreter:
           ast.Or: lambda a, b: a or b
         }
 
-        self.symtable = symtable
+        self.symtable = builtins.__dict__
+
+        self.symtable.update(symtable)
 
     def walk(self, node):
         if node is None: return

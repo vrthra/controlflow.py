@@ -20,10 +20,6 @@ cgi_grammar = {
                   ]
 }
 
-
-### Program to test
-import example
-
 ### Our production framework
 
 # Return the number of nodes
@@ -127,6 +123,8 @@ def coverage_fitness(tree):
     coverage = {}
     trace = sys.gettrace()
     sys.settrace(traceit)
+
+    import example
 
     # Run the function under test
     result = example.cgi_decode(term)

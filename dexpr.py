@@ -24,7 +24,7 @@ def hamming_delta(s1, s2):
     return sum(e1 != e2 for e1, e2 in zip(s1, s2))
 
 def delta(a, b):
-    if type(a) is [int, float] and type(b) is [int, float]: return abs(a - b)
+    if type(a) in [int, float] and type(b) in [int, float]: return abs(a - b)
     elif type(a) is str and type(b) is str: return hamming_delta(a, b)
     else: raise Exception('Incorrect Delta  %s : %s' %(a,b))
 
@@ -63,7 +63,6 @@ class DistInterpreter(interp.ExprInterpreter):
           ast.And: lambda a, b: a + b,
           ast.Or: lambda a, b: min(a, b)
         }
-        self.symtable = symtable
 
     def on_nameconstant(self, node):
         """

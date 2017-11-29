@@ -271,19 +271,16 @@ class PyCFG:
 
         enter_node = CFGNode(parents=[], ast=ast.parse('enter: %s(%s)' % (node.name, ', '.join([a.arg for a in node.args.args])) ).body[0]) # sentinel
         ast.copy_location(enter_node.ast_node, node)
-        exit_node = CFGNode(parents=[], ast=ast.parse('exit: %s' %node.name).body[0]) # sentinel
         enter_node.return_nodes = [] # sentinel
 
         p = [enter_node]
         for n in node.body:
             p = self.walk(n, p)
 
-        ast.copy_location(exit_node.ast_node, node.body[-1])
+        if not enter_node.return_nodes:
+            enter_node.return_nodes = p
 
-        exit_node.add_parents(p)
-        exit_node.add_parents(enter_node.return_nodes)
-
-        self.functions[fname] = [enter_node, exit_node]
+        self.functions[fname] = [enter_node, enter_node.return_nodes]
 
         return myparents
 
@@ -292,9 +289,9 @@ class PyCFG:
             if node.calls:
                 for calls in node.calls:
                     if calls in self.functions:
-                        enter, exit = self.functions[calls]
+                        enter, exits = self.functions[calls]
                         enter.add_parent(node)
-                        node.add_parent(exit)
+                        node.add_parents(exits)
 
     def update_children(self):
         for nid,node in CFGNode.cache.items():
