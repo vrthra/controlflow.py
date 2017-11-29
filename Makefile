@@ -28,17 +28,11 @@ example:
 clean:
 	rm -rf *.*coverage __pycache__/ out.*
 
-I=9
-I=5
-branch_distance_old: approach=3 4 5 6
-branch_distance_old:
-	python3 ./branchfitness.py example.py main $(I) $(approach)
-
 branch_distance: approach=32 33 34 35
 branch_distance: file=example.py
 branch_distance: method=main
 branch_distance:
-	python3 ./branchfitness.py $(file) $(method) $(approach)
+	python3 ./branchfitness.py $(file) $(method) 'abc' $(approach)
 
 a=1
 b=2

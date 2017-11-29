@@ -92,10 +92,11 @@ class Fitness:
 if __name__ == '__main__':
     import sys
     import example
-    path = [int(i) for i in sys.argv[3:]]
+    path = [int(i) for i in sys.argv[4:]]
     ffn = Fitness(sys.argv[1])
     fn = getattr(ffn.my_module, sys.argv[2])
-    ffn.capture_coverage(fn)
+    arg = sys.argv[3]
+    ffn.capture_coverage(lambda: fn(arg))
     fitness = ffn.compute_fitness(path)
     print('Approach Level %d' % ffn.approach_level())
     print('Branch distance(target:%d): %d' % (ffn.target(), ffn.branch_distance()))
