@@ -62,7 +62,7 @@ class CFGNode(dict):
         return {'id':self.rid, 'parents': [p.rid for p in self.parents], 'children': [c.rid for c in self.children], 'calls': self.calls, 'at':self.lineno() ,'ast':self.source()}
 
     @classmethod
-    def to_graph(cls, arcs=None):
+    def to_graph(cls, arcs=[]):
         def unhack(v):
             for i in ['if', 'while', 'for', 'elif']:
                 v = re.sub(r'^_%s:' % i, '%s:' % i, v)
@@ -76,12 +76,15 @@ class CFGNode(dict):
             n.attr['label'] = "%d: %s" % (lineno, unhack(cnode.source()))
             for pn in cnode.parents:
                 plineno = pn.lineno()
-                if  (plineno, lineno) in arcs:
-                    G.add_edge(pn.rid, cnode.rid, color='blue')
-                elif plineno == lineno and lineno in cov_lines:
-                    G.add_edge(pn.rid, cnode.rid, color='blue')
+                if arcs:
+                    if  (plineno, lineno) in arcs:
+                        G.add_edge(pn.rid, cnode.rid, color='blue')
+                    elif plineno == lineno and lineno in cov_lines:
+                        G.add_edge(pn.rid, cnode.rid, color='blue')
+                    else:
+                        G.add_edge(pn.rid, cnode.rid, color='red')
                 else:
-                    G.add_edge(pn.rid, cnode.rid, color='red')
+                    G.add_edge(pn.rid, cnode.rid)
         return G
 
 class PyCFG:
@@ -277,11 +280,8 @@ class PyCFG:
 
         ast.copy_location(exit_node.ast_node, node.body[-1])
 
-        # we assume that the function has at least one return statement.
-        #if enter_node.return_nodes:
+        exit_node.add_parents(p)
         exit_node.add_parents(enter_node.return_nodes)
-        #else:
-        #    exit_node.add_parents(p)
 
         self.functions[fname] = [enter_node, exit_node]
 
@@ -377,6 +377,8 @@ if __name__ == '__main__':
             arcs = [(abs(i),abs(j)) for i,j in cdata.arcs(cdata.measured_files()[0])]
         elif args.ccoverage:
             arcs = [(i,j) for i,j in json.loads(open(args.ccoverage).read())]
+        else:
+            arcs = []
         cfg = PyCFG()
         cfg.gen_cfg(slurp(args.pythonfile).strip())
         g = CFGNode.to_graph(arcs)

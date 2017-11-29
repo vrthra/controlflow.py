@@ -48,7 +48,7 @@ def cgi_decode(s):
     return t
 
 def main(var):
-    return cgi_decode(var)
+    cgi_decode(var)
 
 if __name__ == '__main__':
     import sys

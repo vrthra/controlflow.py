@@ -21,7 +21,6 @@ def traceit(frame, event, arg):
         conditional = next((m.group(1) for m in matches if m), None)
 
         traceit.cov_arcs.append((fname, traceit.prevline, line, conditional, myvars))
-        print(traceit.prevline, line, file=sys.stderr)
         traceit.prevline = line
     else: pass # 'exception'
     return traceit
