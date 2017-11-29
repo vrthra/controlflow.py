@@ -47,8 +47,9 @@ def cgi_decode(s):
         i = i + 1
     return t
 
-def main():
-    cgi_decode('%20abc')
+def main(var):
+    return cgi_decode(var)
 
 if __name__ == '__main__':
-    main()
+    import sys
+    main(sys.argv[1])

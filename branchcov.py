@@ -21,6 +21,7 @@ def traceit(frame, event, arg):
         conditional = next((m.group(1) for m in matches if m), None)
 
         traceit.cov_arcs.append((fname, traceit.prevline, line, conditional, myvars))
+        print(traceit.prevline, line, file=sys.stderr)
         traceit.prevline = line
     else: pass # 'exception'
     return traceit
@@ -44,6 +45,7 @@ if __name__ == '__main__':
     from importlib.machinery import SourceFileLoader
     v = SourceFileLoader('', sys.argv[1]).load_module()
     method = sys.argv[2] if len(sys.argv) > 2 else 'main'
-    arcs, source, bcov = capture_coverage(getattr(v, method))
+    arg = sys.argv[3] if len(sys.argv) > 3 else '%20abc'
+    arcs, source, bcov = capture_coverage(lambda: getattr(v, method)(arg))
     cov = [ (i,j) for f,i,j,src,l in arcs]
     print(json.dumps(cov))

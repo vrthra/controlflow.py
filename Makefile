@@ -1,7 +1,7 @@
+dots: method=main
+dots: arg=%20abc
 dots: coverage
-	@python3  pycfg.py example.py -d -y ./example.bcoverage > out.dot
-
-#dot -Tpng out.dot -o out.png
+	python3  pycfg.py example.py -d -y ./example.bcoverage 2> out.dot
 
 cfg:
 	python3  pycfg.py example.py -c
@@ -9,8 +9,10 @@ cfg:
 show:
 	nl -ba example.py
 
+coverage: method=main
+coverage: arg=%20abc
 coverage:
-	@python3 ./branchcov.py ./example.py main > example.bcoverage
+	python3 ./branchcov.py ./example.py $(method) '$(arg)' > example.bcoverage
 
 oldcoverage:
 	python3 -mcoverage run --branch example.py
@@ -24,7 +26,7 @@ example:
 	cat example.py | nl -b a
 
 clean:
-	rm -rf .coverage __pycache__/
+	rm -rf *.*coverage __pycache__/ out.*
 
 I=9
 I=5

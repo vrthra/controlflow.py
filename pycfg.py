@@ -28,7 +28,7 @@ class CFGNode(dict):
         return self.ast_node.lineno if hasattr(self.ast_node, 'lineno') else 0
 
     def __str__(self):
-        return "id:%d parents: %s src[%d]: %s" % (self.rid, str([p.rid for p in self.parents]), self.lineno(), self.source())
+        return "id:%d line[%d] parents: %s : %s" % (self.rid, self.lineno(), str([p.rid for p in self.parents]), self.source())
 
     def __repr__(self):
         return str(self)
@@ -62,7 +62,7 @@ class CFGNode(dict):
         return {'id':self.rid, 'parents': [p.rid for p in self.parents], 'children': [c.rid for c in self.children], 'calls': self.calls, 'at':self.lineno() ,'ast':self.source()}
 
     @classmethod
-    def to_dot(cls, arcs=None):
+    def to_graph(cls, arcs=None):
         def unhack(v):
             for i in ['if', 'while', 'for', 'elif']:
                 v = re.sub(r'^_%s:' % i, '%s:' % i, v)
@@ -82,8 +82,7 @@ class CFGNode(dict):
                     G.add_edge(pn.rid, cnode.rid, color='blue')
                 else:
                     G.add_edge(pn.rid, cnode.rid, color='red')
-        G.draw('out.png', prog='dot')
-        return G.string()
+        return G
 
 class PyCFG:
     """
@@ -243,13 +242,15 @@ class PyCFG:
         return self.walk(node.value, p)
 
     def on_return(self, node, myparents):
-        parent = myparents[0].parents[0]
+        parent = myparents[0]
+
+        val_node = self.walk(node.value, myparents)
         # on return look back to the function definition.
         while not hasattr(parent, 'return_nodes'):
             parent = parent.parents[0]
         assert hasattr(parent, 'return_nodes')
 
-        p = CFGNode(parents=myparents, ast=node)
+        p = CFGNode(parents=val_node, ast=node)
 
         # make the break one of the parents of label node.
         parent.return_nodes.append(p)
@@ -359,6 +360,7 @@ def get_cfg(pythonfile):
 
 if __name__ == '__main__':
     import json
+    import sys
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('pythonfile', help='The python file to be analyzed')
@@ -377,7 +379,9 @@ if __name__ == '__main__':
             arcs = [(i,j) for i,j in json.loads(open(args.ccoverage).read())]
         cfg = PyCFG()
         cfg.gen_cfg(slurp(args.pythonfile).strip())
-        print(CFGNode.to_dot(arcs))
+        g = CFGNode.to_graph(arcs)
+        g.draw('out.png', prog='dot')
+        print(g.string(), file=sys.stderr)
     elif args.cfg:
         cfg = get_cfg(args.pythonfile)
         for i in sorted(cfg):
