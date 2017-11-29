@@ -1,18 +1,19 @@
+file=example.py
 dots: method=main
 dots: arg=%20abc
 dots: coverage
-	python3  pycfg.py example.py -d -y ./example.bcoverage 2> out.dot
+	python3  pycfg.py $(file) -d -y ./example.bcoverage 2> out.dot
 
 cfg:
-	python3  pycfg.py example.py -c
+	python3  pycfg.py $(file) -c
 
 show:
-	nl -ba example.py
+	nl -ba $(file)
 
 coverage: method=main
 coverage: arg=%20abc
 coverage:
-	python3 ./branchcov.py ./example.py $(method) '$(arg)' > example.bcoverage
+	python3 ./branchcov.py $(file) $(method) '$(arg)' > example.bcoverage
 
 oldcoverage:
 	python3 -mcoverage run --branch example.py
@@ -29,7 +30,6 @@ clean:
 	rm -rf *.*coverage __pycache__/ out.*
 
 branch_distance: approach=32 33 34 35
-branch_distance: file=example.py
 branch_distance: method=main
 branch_distance:
 	python3 ./branchfitness.py $(file) $(method) 'abc' $(approach)
