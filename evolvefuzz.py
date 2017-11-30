@@ -110,14 +110,14 @@ def branch_fitness(tree):
 
     s = 0
     seen = set()
-    print(covered)
-    print(not_covered)
+    #print(covered)
+    #print(not_covered)
     for p,l in not_covered:
         (n, path) = find_path(cfg, cov_arcs, p, seen | {p})
         val = ffn.compute_fitness([l] + path )
-        print(term, val, [l] + path)
+        #print(term, val, [l] + path)
         s += val
-    print()
+    #print()
     return s
 
 
