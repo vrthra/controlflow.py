@@ -95,6 +95,7 @@ class PyCFG:
         self.founder = CFGNode(parents=[], ast=ast.parse('start').body[0]) # sentinel
         self.founder.ast_node.lineno = 0
         self.functions = {}
+        self.functions_node = {}
 
     def parse(self, src):
         return ast.parse(src)
@@ -281,8 +282,18 @@ class PyCFG:
             enter_node.return_nodes = p
 
         self.functions[fname] = [enter_node, enter_node.return_nodes]
+        self.functions_node[enter_node.lineno()] = fname
 
         return myparents
+
+    def get_defining_function(self, node):
+        if node.lineno() in self.functions_node: return self.functions_node[node.lineno()]
+        if not node.parents:
+            self.functions_node[node.lineno()] = ''
+            return ''
+        val = self.get_defining_function(node.parents[0])
+        self.functions_node[node.lineno()] = val
+        return val
 
     def link_functions(self):
         for nid,node in CFGNode.cache.items():
@@ -292,6 +303,10 @@ class PyCFG:
                         enter, exits = self.functions[calls]
                         enter.add_parent(node)
                         node.add_parents(exits)
+
+    def update_functions(self):
+        for nid,node in CFGNode.cache.items():
+            _n = self.get_defining_function(node)
 
     def update_children(self):
         for nid,node in CFGNode.cache.items():
@@ -309,6 +324,7 @@ class PyCFG:
         self.last_node = CFGNode(parents=nodes, ast=ast.parse('stop').body[0])
         ast.copy_location(self.last_node.ast_node, node.body[-1])
         self.update_children()
+        self.update_functions()
         self.link_functions()
 
 def compute_dominator(cfg, start = 0, key='parents'):
@@ -336,7 +352,7 @@ def slurp(f):
     with open(f, 'r') as f: return f.read()
 
 
-def get_cfg(pythonfile):
+def get_cfg(pythonfile, fn=None):
     cfg = PyCFG()
     cfg.gen_cfg(slurp(pythonfile).strip())
     cache = CFGNode.cache
@@ -353,7 +369,32 @@ def get_cfg(pythonfile):
         cs = set([c for c in children_at if c != at])
         g[at]['parents'] |= ps
         g[at]['children'] |= cs
+        if v.calls:
+            g[at]['calls'] = v.calls
+        g[at]['function'] = cfg.functions_node[v.lineno()]
     return (g, cfg.founder.ast_node.lineno, cfg.last_node.ast_node.lineno)
+
+def compute_flow(pythonfile, fn):
+    cfg,first,last = get_cfg(pythonfile, fn)
+    rem = set()
+    for k, v in cfg.items():
+        if v['function'] != fn:
+            rem.add(k)
+
+    new_cfg = {}
+    for k, v in cfg.items():
+        if k in rem: continue
+        else:
+            new_cfg[k] = {}
+            children = [c for c in v['children'] if c not in rem]
+            parents = [p for p in v['parents'] if p not in rem]
+            if 'calls' in cfg[k]:
+                new_cfg[k]['calls'] = cfg[k]['calls']
+            new_cfg[k]['function'] = cfg[k]['function']
+            new_cfg[k]['parents'] = parents
+            new_cfg[k]['children'] = children
+
+    return new_cfg, compute_dominator(new_cfg, start=first), compute_dominator(new_cfg, start=last, key='children')
 
 if __name__ == '__main__':
     import json
@@ -383,5 +424,5 @@ if __name__ == '__main__':
         print(g.string(), file=sys.stderr)
     elif args.cfg:
         cfg = get_cfg(args.pythonfile)
-        for i in sorted(cfg):
+        for i in sorted(cfg.keys()):
             print(i,'parents:', cfg[i]['parents'], 'children:', cfg[i]['children'])

@@ -5,7 +5,9 @@ from grammarfuzz import expand_tree, init_tree, all_terminals
 
 import random
 import sys
+import pycfg
 import branchfitness
+import math
 
 cgi_grammar = {
     "$START": ["$STRING"],
@@ -21,14 +23,6 @@ cgi_grammar = {
 }
 
 ### Our production framework
-
-# Return the number of nodes
-def number_of_nodes(tree):
-    (symbol, children) = tree
-    n = 1
-    for c in children:
-        n += number_of_nodes(c)
-    return n
 
 def all_children_are_terminals(tree):
     def _all_children_are_terminals(tree):
@@ -77,65 +71,54 @@ def mutate(tree, grammar, max_symbols = 10):
     return new_tree
 
 
-### Computing coverage
+### Computing the CFG
 
-# Where we store the coverage
-coverage = {}
+def find_path(cfg, cov_arcs, parent, seen):
+    if parent == 0:
+        return (1, [parent])
+    ks = []
+    for p in sorted(cfg[parent]['parents']):
+        if p == parent: continue
+        if p in seen: continue
+        k = find_path(cfg, cov_arcs, p, seen | {parent})
+        ks.append(k)
+    val = (math.inf, [])
+    if ks:
+        val = min(ks)
+    return (val[0]+1, val[1] + [parent])
 
-# Now, some dynamic analysis
-def traceit(frame, event, arg):
-    global coverage
-    if event == "line":
-        lineno = frame.f_lineno
-        # print("Line", lineno, frame.f_locals)
-        coverage[lineno] = True
-    return traceit
-
-ffn = branchfitness.Fitness('example.py')
-cfg = ffn.cfg
-
+cfg, dom, postdom = pycfg.compute_flow('example.py', 'cgi_decode')
+# Define the fitness of an individual term - by actually testing it
 def branch_fitness(tree):
     import example
     term = all_terminals(tree)
-    #path = [33, 34, 35, 47]
-    path = [34, 36, 46, 47]
+    ffn = branchfitness.Fitness(cfg, dom, postdom)
     ffn.capture_coverage(lambda: example.cgi_decode(term))
-
-    arcs = [ (i,j) for f,i,j,src,l in ffn.cdata_arcs]
+    cov_arcs = {(i,j) for f,i,j,src,l in ffn.cdata_arcs}
     not_covered = set()
     covered = set()
-    for l in cfg:
-        for p in cfg[l]['parents']:
-            if (p, l) not in arcs:
+    # now identify how bad we were
+    for l in ffn.cfg:
+        for p in ffn.cfg[l]['parents']:
+            if (p, l) not in cov_arcs:
                 not_covered.add((p, l))
             else:
                 covered.add((p, l))
-    print(not_covered) 
-    val = ffn.compute_fitness(path)
-    return val
 
-# Define the fitness of an individual term - by actually testing it
-def coverage_fitness(tree):
-    term = all_terminals(tree)
+    # path = [33, 34, 35, 47]
+    # path = [34, 36, 46, 47]
 
-    # Set up the tracer
-    global coverage
-    coverage = {}
-    trace = sys.gettrace()
-    sys.settrace(traceit)
-
-    import example
-
-    # Run the function under test
-    result = example.cgi_decode(term)
-
-    # Turn off the tracer
-    sys.settrace(trace)
-
-    # Simple approach:
-    # The term with the highest coverage gets the highest fitness
-    return len(coverage.keys())
-
+    s = 0
+    seen = set()
+    print(covered)
+    print(not_covered)
+    for p,l in not_covered:
+        (n, path) = find_path(cfg, cov_arcs, p, seen | {p})
+        val = ffn.compute_fitness([l] + path )
+        print(term, val, [l] + path)
+        s += val
+    print()
+    return s
 
 
 # Number of elements in our population
@@ -148,46 +131,27 @@ SELECTION_SIZE = 10
 EVOLUTION_CYCLES = 10
 
 def produce(grammar, max_symbols = 10):
-    # Create an initial derivation tree
-    tree = init_tree()
-    # print(tree)
-
-    # Expand all nonterminals
-    tree = expand_tree(tree, grammar, max_symbols)
-    # print(tree)
-
-    # Return the tree
-    return tree
+    return expand_tree(init_tree(), grammar, max_symbols)
 
 # Create a random population
 def population(grammar):
     pop = []
     while len(pop) < POPULATION_SIZE:
-        # Create a random individual
         tree = produce(grammar)
-
-        # Determine its fitness (by running the test, actually)
-        fitness = branch_fitness(tree)
-
-        # Add it to the population
-        if (tree, fitness) not in pop:
-            pop.append((tree, fitness))
-
-    return pop
+        if tree  not in pop: pop.append(tree)
+    return [(tree, branch_fitness(tree)) for tree in pop]
 
 
 def by_fitness(individual):
+    """Sort by fitness"""
     (tree, fitness) = individual
     return fitness
 
 # Evolve the set
 def evolve(pop, grammar):
-    # Sort population by fitness (highest first)
-    best_pop = sorted(pop, key=by_fitness, reverse=True)
-
-
-    # Select the fittest individuals
-    best_pop = best_pop[:SELECTION_SIZE]
+    # Sort population by fitness (lowest first)
+    # and select the fittest individuals
+    best_pop = sorted(pop, key=by_fitness)[:SELECTION_SIZE]
 
     # Breed
     offspring = []
@@ -200,15 +164,12 @@ def evolve(pop, grammar):
             offspring.append((child, child_fitness))
 
     next_pop = best_pop + offspring
-
-    # Keep it sorted
-    next_pop = sorted(next_pop, key=by_fitness, reverse=True)
-
     return next_pop
 
 # TODO: Not only check total lines covered, but _new_ lines covered
 
 def print_population(pop):
+    pop = sorted(pop, key=by_fitness)
     for (tree, fitness) in pop:
         print(all_terminals(tree) + " " + repr(fitness))
 
@@ -222,14 +183,12 @@ if __name__ == "__main__":
     # Create a population
     print("Population:")
     pop = population(grammar)
-    pop = sorted(pop, key=by_fitness, reverse=True)
     print_population(pop)
 
     for i in range(EVOLUTION_CYCLES):
         # Evolve the population
         print("Evolved:")
-        next_pop = evolve(pop, grammar)
-        print_population(next_pop)
-        pop = next_pop
+        pop = evolve(pop, grammar)
+        print_population(pop)
 
 

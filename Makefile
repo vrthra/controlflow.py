@@ -13,7 +13,7 @@ show:
 coverage: method=main
 coverage: arg=%20abc
 coverage:
-	python3 ./branchcov.py $(file) $(method) '$(arg)' > example.bcoverage
+	python3 ./branchcov.py $(file) $(method) '$(arg)' 2> example.bcoverage
 
 oldcoverage:
 	python3 -mcoverage run --branch example.py
@@ -32,7 +32,8 @@ clean:
 branch_distance: approach=32 33 34 35
 branch_distance: method=main
 branch_distance:
-	python3 ./branchfitness.py $(file) $(method) 'abc' $(approach)
+	python3 ./branchfitness.py triangle.py main '1 2 0' 7 13 14
+	#python3 ./branchfitness.py $(file) $(method) 'abc' $(approach)
 
 a=1
 b=2

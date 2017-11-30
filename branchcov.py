@@ -9,9 +9,6 @@ Control_Flow_Re = [re.compile(r'^ *%s +(.+) *: *' % i) for i in Control_Flow]
 # that can be evaluated.
 
 def traceit(frame, event, arg):
-    traceit.prevline = vars(traceit).setdefault('prevline', 0)
-    traceit.cov_arcs = vars(traceit).setdefault('cov_arcs', [])
-
     if event in ['call', 'return', 'line']:
         fname, line = frame.f_code.co_filename, frame.f_lineno
         myvars = {**frame.f_globals, **frame.f_locals} # should we do deep copy?
@@ -26,6 +23,8 @@ def traceit(frame, event, arg):
     return traceit
 
 def capture_coverage(fn):
+    traceit.cov_arcs = []
+    traceit.prevline = 0
     oldtrace = sys.gettrace()
     sys.settrace(traceit)
     fn()

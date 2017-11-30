@@ -7,11 +7,12 @@ import branchcov
 from importlib.machinery import SourceFileLoader
 
 class Fitness:
-    def __init__(self, filename):
-        self.init_cfg(filename)
+    def __init__(self, cfg, dom, postdom):
+        self.cfg = cfg
+        self.dom = dom
+        self.postdom = postdom
 
     def init_cfg(self, filename):
-        self.my_module = SourceFileLoader('', filename).load_module()
         cfg, founder, last_node = pycfg.get_cfg(filename)
         self.cfg = dict(cfg)
         self.dom = pycfg.compute_dominator(self.cfg, start=founder, key='parents')
@@ -23,7 +24,10 @@ class Fitness:
     def compute_fitness(self, path):
         def normalized(x): return x / (x + 1.0)
         self.path = path
-        return (self.approach_level() + normalized(self.branch_distance()))
+        al = self.approach_level()
+        bd = self.branch_distance()
+        if bd == math.inf: return al
+        return (al + normalized(bd))
 
     def print_dom(dom):
         for k in dom: print(k, dom[k])
@@ -36,7 +40,14 @@ class Fitness:
 
     def branch_distance(self):
         parents = self.cfg[self.target()]['parents']
-        return min(self._branch_distance(p, self.target(), set()) for p in parents)
+        if parents:
+            v = min(self._branch_distance(p, self.target(), set()) for p in parents)
+            if v == math.inf:
+                return 0
+            else:
+                return v
+        else:
+            return 0
 
     def compute_predicate_cost(self, parent, target):
         f,src,l = self.source_code[parent]
@@ -45,13 +56,13 @@ class Fitness:
         return v
 
     def _branch_distance(self, parent, target, seen):
-        seen.add(target)
+        seen = seen | {(parent, target)}
         parent_dict = self.cfg[parent]
 
-        gparents = [p for p in parent_dict['parents'] if p not in seen]
+        gparents = [gp for gp in parent_dict['parents'] if (gp, parent) not in seen] # TODO: filter out call sites
 
         # was the parent executed?
-        if parent in self.branch_cov:
+        if parent in self.branch_cov: # and hasattr(target, 'calls'):
             # the parent was executed. Hence, if the target is executed
             # then there is no cost.
             if target in self.branch_cov[parent]:
@@ -64,7 +75,8 @@ class Fitness:
         else: # The parent was not executed. So go up the chain
 
             # if we can not go further up, we dont know how close we came
-            if not gparents: return math.inf
+            if not gparents:
+                return math.inf
 
             # go up the minimum chain.
             return min(self._branch_distance(gp, parent, seen) for gp in gparents)
@@ -91,10 +103,10 @@ class Fitness:
 
 if __name__ == '__main__':
     import sys
-    import example
     path = [int(i) for i in sys.argv[4:]]
-    ffn = Fitness(sys.argv[1])
-    fn = getattr(ffn.my_module, sys.argv[2])
+    ffn = Fitness(*pycfg.compute_flow(sys.argv[1], 'check_triangle'))
+    my_module = SourceFileLoader('', sys.argv[1]).load_module()
+    fn = getattr(my_module, sys.argv[2])
     arg = sys.argv[3]
     ffn.capture_coverage(lambda: fn(arg))
     fitness = ffn.compute_fitness(path)
