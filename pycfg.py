@@ -332,7 +332,7 @@ class PyCFG:
         node = self.parse(src)
         nodes = self.walk(node, [self.founder])
         self.last_node = CFGNode(parents=nodes, ast=ast.parse('stop').body[0])
-        ast.copy_location(self.last_node.ast_node, node.body[-1])
+        ast.copy_location(self.last_node.ast_node, self.founder.ast_node)
         self.update_children()
         self.update_functions()
         self.link_functions()

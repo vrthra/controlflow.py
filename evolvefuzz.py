@@ -18,7 +18,7 @@ cgi_grammar = {
     "$PERCENT": ["%$HEX_DIGIT$HEX_DIGIT"],
     "$HEX_DIGIT": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
                    "a", "b", "c", "d", "e", "f",
-                   "?" # Invalid value
+                   "?", # Invalid value
                   ]
 }
 
@@ -122,10 +122,10 @@ def branch_fitness(tree):
 
 
 # Number of elements in our population
-POPULATION_SIZE = 20
+POPULATION_SIZE = 40
 
 # How many of these to select for the next generation
-SELECTION_SIZE = 10
+SELECTION_SIZE = 20
 
 # How many evolution cycles
 EVOLUTION_CYCLES = 10
@@ -171,7 +171,8 @@ def evolve(pop, grammar):
 def print_population(pop):
     pop = sorted(pop, key=by_fitness)
     for (tree, fitness) in pop:
-        print(all_terminals(tree) + " " + repr(fitness))
+        print("%s\t%s" % (repr(fitness), all_terminals(tree)))
+    return pop[0]
 
 if __name__ == "__main__":
     grammar = cgi_grammar
@@ -180,15 +181,19 @@ if __name__ == "__main__":
     print("Tree: " + all_terminals(tree))
     print("Fitness: " + repr(branch_fitness(tree)))
 
-    # Create a population
-    print("Population:")
-    pop = population(grammar)
-    print_population(pop)
-
-    for i in range(EVOLUTION_CYCLES):
-        # Evolve the population
-        print("Evolved:")
-        pop = evolve(pop, grammar)
+    best = []
+    for i in range(1,10):
+        # Create a population
+        print("Population:")
+        pop = population(grammar)
         print_population(pop)
-
+        p = pop
+        for i in range(EVOLUTION_CYCLES):
+            # Evolve the population
+            print("Evolved:")
+            pop = evolve(pop, grammar)
+            p = print_population(pop)
+            print()
+        best.append(p)
+    print_population(best)
 

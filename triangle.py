@@ -8,10 +8,12 @@ def triangle(a, b, c):
             return 'Isosceless'
     else:
         if b == c:
-            return 'Isosceless'
+            return "Isosceles"
         else:
-            return 'Scalene'
-
+            if a == c:
+                return "Isosceles"
+            else:
+                return "Scalene"
 def main(arg):
     v = arg.split(' ')
     v = triangle(int(v[0]), int(v[1]), int(v[2]))

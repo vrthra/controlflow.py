@@ -52,10 +52,10 @@ class DistInterpreter(interp.ExprInterpreter):
           ast.Gt: lambda a, b: 0 if a > b else delta(a, b),
           ast.GtE: lambda a, b: 0 if a >= b else delta(a, b),
 
-          ast.Is: lambda a, b: a is b,
-          ast.IsNot: lambda a, b: a is not b,
-          ast.In: lambda a, b: a in b,
-          ast.NotIn: lambda a, b: a not in b
+          ast.Is: lambda a, b: 0 if a is b else 1,
+          ast.IsNot: lambda a, b: 0 if a is not b else 1,
+          ast.In: lambda a, b: 0 if  a in b else len(b),
+          ast.NotIn: lambda a, b: 0 if a not in b else len(b)
         }
 
         # boolop = And | Or

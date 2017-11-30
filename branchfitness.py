@@ -62,7 +62,7 @@ class Fitness:
         gparents = [gp for gp in parent_dict['parents'] if (gp, parent) not in seen] # TODO: filter out call sites
 
         # was the parent executed?
-        if parent in self.branch_cov: # and hasattr(target, 'calls'):
+        if parent in self.branch_cov and hasattr(target, 'calls'):
             # the parent was executed. Hence, if the target is executed
             # then there is no cost.
             if target in self.branch_cov[parent]:
