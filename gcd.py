@@ -14,7 +14,10 @@ def gcd(a, b):
 
 def main(arg):
     v = arg.split(' ')
-    print(gcd(int(v[0]), int(v[1])))
+    v = gcd(int(v[0]), int(v[1]))
+    print(v)
+
 
 if __name__ == '__main__':
     main(sys.argv[0])
+    pass

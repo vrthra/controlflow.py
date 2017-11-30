@@ -14,7 +14,9 @@ def triangle(a, b, c):
 
 def main(arg):
     v = arg.split(' ')
-    print(triangle(int(v[0]), int(v[1]), int(v[2])))
+    v = triangle(int(v[0]), int(v[1]), int(v[2]))
+    print(v)
 
 if __name__ == '__main__':
     main(sys.argv[0])
+    pass

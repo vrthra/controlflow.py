@@ -130,7 +130,10 @@ class PyCFG:
         """
         if len(node.targets) > 1: raise NotImplemented('Parallel assignments')
 
-        return [CFGNode(parents=myparents, ast=node)]
+        p = [CFGNode(parents=myparents, ast=node)]
+        p = self.walk(node.value, p)
+
+        return p
 
     def on_pass(self, node, myparents):
         return [CFGNode(parents=myparents, ast=node)]
@@ -238,7 +241,12 @@ class PyCFG:
         p = myparents
         for a in node.args:
             p = self.walk(a, p)
-        myparents[0].add_calls(node.func.id)
+        mid = None
+        if hasattr(node.func, 'id'):
+            mid = node.func.id
+        else:
+            mid = node.func.value.id
+        myparents[0].add_calls(mid)
         return p
 
     def on_expr(self, node, myparents):
