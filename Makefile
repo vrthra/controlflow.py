@@ -28,13 +28,13 @@ cgi.branch_distance:; $(MAKE) branch_distance file=cgidecode.py  method=main arg
 tri.branch_distance:; $(MAKE) branch_distance file=triangle.py method=main arg='1 2 0'  approach='4 5 6'
 gcd.branch_distance:; $(MAKE) branch_distance file=gcd.py method=main arg='15 12'  approach='3 4 5'
 
-cgi.dots: arg='%20abc'
+cgi.dots: arg=%20abc
 cgi.dots:; $(MAKE) dots file=cgidecode.py arg='$(arg)'
 
-tri.dots: arg='1 2 0'
+tri.dots: arg=1 2 0
 tri.dots:; $(MAKE) dots file=triangle.py arg='$(arg)'
 
-gcd.dots: arg='15 12'
+gcd.dots: arg=15 12
 gcd.dots:; $(MAKE) dots file=gcd.py arg='$(arg)'
 
 a=1
