@@ -32,9 +32,9 @@ clean:
 branch_distance: approach=32 33 34 35
 branch_distance: method=main
 branch_distance:
-	python3 ./branchfitness.py triangle.py main '1 2 0' 7 13 14
-	python3 ./branchfitness.py gcd.py main '15 12' 3 4 5
 	python3 ./branchfitness.py example.py main 'abc'  33 34 35
+	python3 ./branchfitness.py gcd.py main '15 12' 3 4 5
+	python3 ./branchfitness.py triangle.py main '1 2 0' 4 5 6
 	#python3 ./branchfitness.py $(file) $(method) 'abc' $(approach)
 
 a=1

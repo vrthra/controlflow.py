@@ -49,7 +49,9 @@ def cgi_decode(s):
 
 def main(var):
     cgi_decode(var)
+    pass
 
 if __name__ == '__main__':
     import sys
     main(sys.argv[1])
+    pass

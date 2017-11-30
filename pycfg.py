@@ -302,7 +302,9 @@ class PyCFG:
                     if calls in self.functions:
                         enter, exits = self.functions[calls]
                         enter.add_parent(node)
-                        node.add_parents(exits)
+                        #node.add_parents(exits)
+                        if node.children:
+                            for c in node.children: c.add_parents(exits)
 
     def update_functions(self):
         for nid,node in CFGNode.cache.items():
@@ -352,7 +354,7 @@ def slurp(f):
     with open(f, 'r') as f: return f.read()
 
 
-def get_cfg(pythonfile, fn=None):
+def get_cfg(pythonfile):
     cfg = PyCFG()
     cfg.gen_cfg(slurp(pythonfile).strip())
     cache = CFGNode.cache
@@ -374,27 +376,9 @@ def get_cfg(pythonfile, fn=None):
         g[at]['function'] = cfg.functions_node[v.lineno()]
     return (g, cfg.founder.ast_node.lineno, cfg.last_node.ast_node.lineno)
 
-def compute_flow(pythonfile, fn):
-    cfg,first,last = get_cfg(pythonfile, fn)
-    rem = set()
-    for k, v in cfg.items():
-        if v['function'] != fn:
-            rem.add(k)
-
-    new_cfg = {}
-    for k, v in cfg.items():
-        if k in rem: continue
-        else:
-            new_cfg[k] = {}
-            children = [c for c in v['children'] if c not in rem]
-            parents = [p for p in v['parents'] if p not in rem]
-            if 'calls' in cfg[k]:
-                new_cfg[k]['calls'] = cfg[k]['calls']
-            new_cfg[k]['function'] = cfg[k]['function']
-            new_cfg[k]['parents'] = parents
-            new_cfg[k]['children'] = children
-
-    return new_cfg, compute_dominator(new_cfg, start=first), compute_dominator(new_cfg, start=last, key='children')
+def compute_flow(pythonfile):
+    cfg,first,last = get_cfg(pythonfile)
+    return cfg, compute_dominator(cfg, start=first), compute_dominator(cfg, start=last, key='children')
 
 if __name__ == '__main__':
     import json

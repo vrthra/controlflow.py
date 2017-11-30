@@ -87,7 +87,7 @@ def find_path(cfg, cov_arcs, parent, seen):
         val = min(ks)
     return (val[0]+1, val[1] + [parent])
 
-cfg, dom, postdom = pycfg.compute_flow('example.py', 'cgi_decode')
+cfg, dom, postdom = pycfg.compute_flow('example.py')
 # Define the fitness of an individual term - by actually testing it
 def branch_fitness(tree):
     import example

@@ -104,7 +104,7 @@ class Fitness:
 if __name__ == '__main__':
     import sys
     path = [int(i) for i in sys.argv[4:]]
-    ffn = Fitness(*pycfg.compute_flow(sys.argv[1], 'cgi_decode'))
+    ffn = Fitness(*pycfg.compute_flow(sys.argv[1]))
     my_module = SourceFileLoader('', sys.argv[1]).load_module()
     fn = getattr(my_module, sys.argv[2])
     arg = sys.argv[3]
