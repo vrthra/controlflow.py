@@ -17,7 +17,7 @@ class ExprInterpreter:
         # unaryop = Invert | Not | UAdd | USub
         self.unaryop = {
           ast.Invert: lambda a: ~a,
-          ast.Not: lambda a: a,
+          ast.Not: lambda a: not a,
           ast.UAdd: lambda a: +a,
           ast.USub: lambda a: -a
         }
@@ -75,8 +75,30 @@ class ExprInterpreter:
         Module(stmt* body)
         """
         # return value of module is the last statement
-        assert len(node.body) == 1
-        return self.walk(node.body[0])
+        res = None
+        for p in node.body:
+            res = self.walk(p)
+        return res
+
+    def on_list(self, node):
+        """
+        List(elts)
+        """
+        res = []
+        for p in node.elts:
+            v = self.walk(p)
+            res.append(v)
+        return res
+
+    def on_tuple(self, node):
+        """
+        Tuple(elts)
+        """
+        res = []
+        for p in node.elts:
+            v = self.walk(p)
+            res.append(v)
+        return res
 
     def on_str(self, node):
         """
@@ -94,8 +116,6 @@ class ExprInterpreter:
         """
         NameConstant(singleton value)
         """
-        if type(node.value) is bool:
-            return 0 if node.value else 1
         return node.value
 
     def on_name(self, node):
