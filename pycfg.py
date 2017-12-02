@@ -16,6 +16,7 @@ class CFGNode(dict):
     cache = {}
     stack = []
     def __init__(self, parents=[], ast=None):
+        assert type(parents) is list
         self.parents = parents
         self.calls = []
         self.children = []
@@ -139,10 +140,10 @@ class PyCFG:
         return [CFGNode(parents=myparents, ast=node)]
 
     def on_break(self, node, myparents):
-        parent = myparents[0].parents[0]
+        parent = myparents[0]
         while not hasattr(parent, 'exit_nodes'):
             # we have ordered parents
-            parent = CFGNode.i(parent).parents[0]
+            parent = parent.parents[0]
 
         assert hasattr(parent, 'exit_nodes')
         p = CFGNode(parents=myparents, ast=node)
@@ -154,7 +155,7 @@ class PyCFG:
         return []
 
     def on_continue(self, node, myparents):
-        parent = myparents[0].parents[0]
+        parent = myparents[0]
         while not hasattr(parent, 'exit_nodes'):
             # we have ordered parents
             parent = parent.parents[0]
@@ -181,12 +182,12 @@ class PyCFG:
         ast.copy_location(extract_node.ast_node, _test_node.ast_node)
 
         # now we evaluate the body, one at a time.
-        p1 = extract_node
+        p1 = [extract_node]
         for n in node.body:
             p1 = self.walk(n, p1)
 
         # the test node is looped back at the end of processing.
-        _test_node.add_parent(p1)
+        _test_node.add_parents(p1)
 
         return _test_node.exit_nodes + test_node
 
@@ -238,14 +239,22 @@ class PyCFG:
         return self.walk(node.operand, myparents)
 
     def on_call(self, node, myparents):
+        def get_func(node):
+            if type(node.func) is ast.Name:
+                mid = node.func.id
+            elif type(node.func) is ast.Attribute:
+                mid = node.func.attr
+            elif type(node.func) is ast.Call:
+                mid = get_func(node.func)
+            else:
+                raise Exception(str(type(node.func)))
+            return mid
+                #mid = node.func.value.id
+
         p = myparents
         for a in node.args:
             p = self.walk(a, p)
-        mid = None
-        if hasattr(node.func, 'id'):
-            mid = node.func.id
-        else:
-            mid = node.func.value.id
+        mid = get_func(node)
         myparents[0].add_calls(mid)
         return p
 
@@ -415,6 +424,6 @@ if __name__ == '__main__':
         g.draw('out.png', prog='dot')
         print(g.string(), file=sys.stderr)
     elif args.cfg:
-        cfg = get_cfg(args.pythonfile)
+        cfg,first,last = get_cfg(args.pythonfile)
         for i in sorted(cfg.keys()):
             print(i,'parents:', cfg[i]['parents'], 'children:', cfg[i]['children'])
