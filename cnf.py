@@ -18,7 +18,8 @@ class CNFInterpreter(interp.ExprInterpreter):
 
         # ignore values for now.
         self.symtable = collections.defaultdict(int)
-        self.cache = {}
+        self.src_cache = {}
+        self.nid_cache = {}
         self._nid = 0
 
     def on_expr(self, node):
@@ -31,7 +32,16 @@ class CNFInterpreter(interp.ExprInterpreter):
 
     def nid(self):
         self._nid += 1
-        return ast.Num(self._nid)
+        return ast.Name('X%d' % self._nid, None)
+
+    def add_cache(self, node):
+        src = astunparse.unparse(node)
+        if src in self.src_cache: return self.src_cache[src]
+        nid = self.nid()
+        self.src_cache[src] = nid
+        self.nid_cache[nid] = node
+        return nid
+
 
     def enflatten(self, node):
         if type(node) is ast.UnaryOp:
@@ -98,29 +108,32 @@ class CNFInterpreter(interp.ExprInterpreter):
         if type(node) is ast.Compare: # eq lt gt
             # recursion ends here.
             if type(node.ops[0]) is ast.NotEq:
-                node.ops[0] = ast.Eq
-                newnode = ast.UnaryOp(ast.Not(), node)
-                src = astunparse.unparse(newnode)
-                if src in self.cache: return self.cache[src]
-                nid = self.nid()
-                self.cache[nid] = newnode
-                return nid
-            if type(node.ops[0]) is ast.Gt:
+                node.ops[0] = ast.Eq()
+                nid = self.add_cache(node)
+                newnode = ast.UnaryOp(ast.Not(), nid)
+                return newnode
+            elif type(node.ops[0]) is ast.Gt:
                 node.ops[0] = ast.LtE()
-                newnode = ast.UnaryOp(ast.Not(), node)
-                src = astunparse.unparse(newnode)
-                if src in self.cache: return self.cache[src]
-                nid = self.nid()
-                self.cache[nid] = newnode
+                nid = self.add_cache(node)
+                newnode = ast.UnaryOp(ast.Not(), nid)
+                return newnode
+            elif type(node.ops[0]) is ast.GtE:
+                node.ops[0] = ast.Lt()
+                nid = self.add_cache(node)
+                newnode = ast.UnaryOp(ast.Not(), nid)
+                return newnode
+
+            elif type(node.ops[0]) is ast.Eq:
+                nid = self.add_cache(node)
                 return nid
-            if type(node.ops[0]) is ast.GtE:
-                node.ops[0] = ast.Lt
-                newnode = ast.UnaryOp(ast.Not(), node)
-                src = astunparse.unparse(newnode)
-                if src in self.cache: return self.cache[src]
-                nid = self.nid()
-                self.cache[nid] = newnode
+            elif type(node.ops[0]) is ast.Lt:
+                nid = self.add_cache(node)
                 return nid
+            elif type(node.ops[0]) is ast.LtE:
+                nid = self.add_cache(node)
+                return nid
+            else:
+                return node
         elif type(node) is ast.BoolOp: # and or
             # recursion on the operands
             values = [self.stdtrans(i) for i in node.values]
