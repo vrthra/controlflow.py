@@ -31,7 +31,74 @@ class CNFInterpreter(interp.ExprInterpreter):
         self.get_literals(vx)
         print("literals: %s" % str([s for s in self.literals.keys()]))
         print(astunparse.unparse(vx))
+
+        self.satisfy(vx, self.literals, {})
         return self.walk(v)
+
+    def get_unit_clauses(self, node, guess):
+        assert type(node) is ast.BoolOp
+        assert type(node.op) is ast.And
+        remains = []
+        for clause in node.values:
+            assert type(clause.op) is ast.Or
+            lit = []
+            nfalse = 0
+            for v in clause.values:
+                if v.id[0] == '_':
+                    if v.id[1:] not in guess:
+                        lit.append((v.id[1:], False))
+                    else: # ignore
+                        pass
+                else:
+                    if v.id not in guess:
+                        lit.append((v.id, True))
+                    else: # ignore
+                        pass
+            if len(lit) == 1:
+                remains.append(lit[0])
+        return remains
+
+    def closure(self, node, guess):
+        remains = self.get_unit_clauses(node, guess)
+        dremains = self.consistent(remains)
+        if not dremains: return None
+        guess = {**guess, **dremains}
+        while remains:
+            remains = self.get_unit_clauses(node, guess)
+            dremains = self.consistent(remains)
+            if not dremains: return None
+            guess = {**guess, **dremains}
+        return guess
+
+    def consistent(self, vx):
+        # ensure that no True/False clash for same literals happen.
+        d = {}
+        for (k,v) in vx:
+            if k in d:
+                if d[k] != v: return None
+            else:
+                d[k] = v
+        return d
+
+    def satisfy(self, node, lst, guess):
+        def restofit(lst, guess):
+            # strip out all guess keys from lst
+            return [i for i in lst if i not in guess]
+
+        if not lst: return True
+        # guess hd
+        hd, *tl = lst
+        # can all unit clauses be satisfied?
+        guess = {hd: True}
+        assignments = self.closure(node, guess)
+        # verify clauses
+        if not(assignments):
+            guess = {hd: False}
+            assignments = self.closure(node, guess)
+        if not(assignments): return False
+        return self.satisfy(node, restofit(lst, assignments.keys()), assignments)
+
+
 
     def get_literals(self, node):
         if type(node) is ast.UnaryOp:
@@ -46,19 +113,29 @@ class CNFInterpreter(interp.ExprInterpreter):
                 for i in node.values:
                     self.get_literals(i)
         elif type(node) is ast.Name:
-            self.literals[node.id] = None
+            if node.id[0] == '_':
+                self.literals[node.id[1:]] = None
+            else:
+                self.literals[node.id] = None
 
     def nid(self):
         self._nid += 1
-        return ast.Name('_X%d' % self._nid, None)
+        return self._nid
 
-    def add_cache(self, node):
+    def add_cache(self, node, is_not):
         src = astunparse.unparse(node)
-        if src in self.src_cache: return self.src_cache[src]
+        if is_not:
+            if src in self.src_cache: return ast.UnaryOp(ast.Not(), self.src_cache[src])
+        else:
+            if src in self.src_cache: return self.src_cache[src]
         nid = self.nid()
-        self.src_cache[src] = nid
+        name = ast.Name('X%d' % self._nid, None)
+        self.src_cache[src] = name
         self.nid_cache[nid] = node
-        return nid
+        if is_not:
+            return ast.Name('_X%d' % self._nid, None)
+        else:
+            return name
 
 
     def enflatten(self, node):
@@ -127,28 +204,28 @@ class CNFInterpreter(interp.ExprInterpreter):
             # recursion ends here.
             if type(node.ops[0]) is ast.NotEq:
                 node.ops[0] = ast.Eq()
-                nid = self.add_cache(node)
+                nid = self.add_cache(node, True)
                 newnode = ast.UnaryOp(ast.Not(), nid)
                 return newnode
             elif type(node.ops[0]) is ast.Gt:
                 node.ops[0] = ast.LtE()
-                nid = self.add_cache(node)
+                nid = self.add_cache(node, True)
                 newnode = ast.UnaryOp(ast.Not(), nid)
                 return newnode
             elif type(node.ops[0]) is ast.GtE:
                 node.ops[0] = ast.Lt()
-                nid = self.add_cache(node)
+                nid = self.add_cache(node, True)
                 newnode = ast.UnaryOp(ast.Not(), nid)
                 return newnode
 
             elif type(node.ops[0]) is ast.Eq:
-                nid = self.add_cache(node)
+                nid = self.add_cache(node, False)
                 return nid
             elif type(node.ops[0]) is ast.Lt:
-                nid = self.add_cache(node)
+                nid = self.add_cache(node, False)
                 return nid
             elif type(node.ops[0]) is ast.LtE:
-                nid = self.add_cache(node)
+                nid = self.add_cache(node, False)
                 return nid
             else:
                 return node
