@@ -21,18 +21,36 @@ class CNFInterpreter(interp.ExprInterpreter):
         self.src_cache = {}
         self.nid_cache = {}
         self._nid = 0
+        self.literals = {}
 
     def on_expr(self, node):
         not_bottom = self.not_down(node.value)
         rename_clause = self.stdtrans(not_bottom)
         v = self.distribute_and_over_or(rename_clause)
         vx = self.enflatten(v)
+        self.get_literals(vx)
+        print("literals: %s" % str([s for s in self.literals.keys()]))
         print(astunparse.unparse(vx))
         return self.walk(v)
 
+    def get_literals(self, node):
+        if type(node) is ast.UnaryOp:
+            if type(node.op) is ast.Not:
+                self.get_literals(node.operand)
+            else:
+                raise None
+        elif type(node) is ast.Compare:
+           raise None
+        elif type(node) is ast.BoolOp:
+            if type(node.op) in [ast.And, ast.Or]:
+                for i in node.values:
+                    self.get_literals(i)
+        elif type(node) is ast.Name:
+            self.literals[node.id] = None
+
     def nid(self):
         self._nid += 1
-        return ast.Name('X%d' % self._nid, None)
+        return ast.Name('_X%d' % self._nid, None)
 
     def add_cache(self, node):
         src = astunparse.unparse(node)
