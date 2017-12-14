@@ -20,6 +20,7 @@ class CFGNode(dict):
         self.parents = parents
         self.calls = []
         self.children = []
+        self.fnlink = False
         self.ast_node = ast
         self.rid  = CFGNode.registry
         CFGNode.cache[self.rid] = self
@@ -256,6 +257,12 @@ class PyCFG:
             p = self.walk(a, p)
         mid = get_func(node)
         myparents[0].add_calls(mid)
+
+        # these need to be unlinked later.
+        # during a call, the direct child is not the next
+        # statement in text.
+        for c in p:
+            c.fnlink = True
         return p
 
     def on_expr(self, node, myparents):
@@ -319,9 +326,14 @@ class PyCFG:
                     if calls in self.functions:
                         enter, exits = self.functions[calls]
                         enter.add_parent(node)
-                        #node.add_parents(exits)
                         if node.children:
-                            for c in node.children: c.add_parents(exits)
+                            if node.fnlink:
+                                # until we link the functions up, the node should only
+                                # have succeeding node in text as children.
+                                assert(len(node.children) == 1)
+                                for c in node.children: c.parents = exits
+                            else:
+                                for c in node.children: c.add_parents(exits)
 
     def update_functions(self):
         for nid,node in CFGNode.cache.items():

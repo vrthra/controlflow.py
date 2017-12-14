@@ -75,7 +75,7 @@ def mutate(tree, grammar, max_symbols = 10):
 
 def find_path(cfg, cov_arcs, parent, seen):
     if parent == 0:
-        return (1, [parent])
+        return (1, [])
     ks = []
     for p in sorted(cfg[parent]['parents']):
         if p == parent: continue
@@ -93,7 +93,7 @@ def branch_fitness(tree):
     import example
     term = all_terminals(tree)
     ffn = branchfitness.Fitness(cfg, dom, postdom)
-    ffn.capture_coverage(lambda: example.cgi_decode(term))
+    ffn.capture_coverage(lambda: example.cgi_decode(term), 'example.py')
     cov_arcs = {(i,j) for f,i,j,src,l in ffn.cdata_arcs}
     not_covered = set()
     covered = set()
@@ -105,17 +105,11 @@ def branch_fitness(tree):
             else:
                 covered.add((p, l))
 
-    # path = [33, 34, 35, 47]
-    # path = [34, 36, 46, 47]
-
     s = 0
     seen = set()
-    #print(covered)
-    #print(not_covered)
     for p,l in not_covered:
         (n, path) = find_path(cfg, cov_arcs, p, seen | {p})
-        val = ffn.compute_fitness([l] + path )
-        #print(term, val, [l] + path)
+        val = ffn.compute_fitness(path + [l])
         s += val
     #print()
     return s

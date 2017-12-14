@@ -18,8 +18,9 @@ class Fitness:
         self.dom = pycfg.compute_dominator(self.cfg, start=founder, key='parents')
         self.postdom = pycfg.compute_dominator(self.cfg, start=last_node, key='children')
 
-    def capture_coverage(self, fn):
-        self.cdata_arcs, self.source_code, self.branch_cov = branchcov.capture_coverage(fn)
+    def capture_coverage(self, fn, fsrc):
+        self.cdata_arcs, self.source_code, self.branch_cov = branchcov.capture_coverage(fn, fsrc)
+
 
     def compute_fitness(self, path):
         def normalized(x): return x / (x + 1.0)
@@ -62,15 +63,19 @@ class Fitness:
         gparents = [gp for gp in parent_dict['parents'] if (gp, parent) not in seen] # TODO: filter out call sites
 
         # was the parent executed?
-        if parent in self.branch_cov and not hasattr(self.cfg[parent], 'calls'):
+        if parent in self.branch_cov:
             # the parent was executed. Hence, if the target is executed
             # then there is no cost.
             if target in self.branch_cov[parent]:
                 return 0
 
             # the target was not executed. Hence the flow diverged here.
-            # print(parent, target)
-            return self.compute_predicate_cost(parent, target)
+            # do not attempt to compute predicate cost unless it is a conditional
+            if len(self.cfg[parent]['children']) > 1 and 'calls' not in self.cfg[parent]:
+                return self.compute_predicate_cost(parent, target)
+            else:
+                # not a conditional.
+                return min(self._branch_distance(gp, parent, seen) for gp in gparents)
 
         else: # The parent was not executed. So go up the chain
 
@@ -108,7 +113,7 @@ if __name__ == '__main__':
     my_module = SourceFileLoader('', sys.argv[1]).load_module()
     fn = getattr(my_module, sys.argv[2])
     arg = sys.argv[3]
-    ffn.capture_coverage(lambda: fn(arg))
+    ffn.capture_coverage(lambda: fn(arg), sys.argv[1])
     fitness = ffn.compute_fitness(path)
     print('Approach Level %d' % ffn.approach_level())
     print('Branch distance(target:%d): %d' % (ffn.target(), ffn.branch_distance()))
